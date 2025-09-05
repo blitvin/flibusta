@@ -81,7 +81,7 @@ CREATE TABLE public.book_zip (
 );
 
 
-ALTER TABLE public.book_zip OWNER TO flibusta;
+ALTER TABLE public.book_zip OWNER TO :FLIBUSTA_DBUSER;
 
 --
 -- TOC entry 203 (class 1259 OID 16494)
@@ -96,7 +96,7 @@ CREATE SEQUENCE public.book_zip_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.book_zip_id_seq OWNER TO flibusta;
+ALTER TABLE public.book_zip_id_seq OWNER TO :FLIBUSTA_DBUSER;
 
 --
 -- TOC entry 3278 (class 0 OID 0)
@@ -121,7 +121,7 @@ CREATE TABLE public.fav (
 );
 
 
-ALTER TABLE public.fav OWNER TO flibusta;
+ALTER TABLE public.fav OWNER TO :FLIBUSTA_DBUSER;
 
 --
 -- TOC entry 236 (class 1259 OID 206111)
@@ -137,7 +137,7 @@ CREATE SEQUENCE public.fav_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.fav_id_seq OWNER TO flibusta;
+ALTER TABLE public.fav_id_seq OWNER TO :FLIBUSTA_DBUSER;
 
 --
 -- TOC entry 3279 (class 0 OID 0)
@@ -159,7 +159,7 @@ CREATE TABLE public.fav_users (
 );
 
 
-ALTER TABLE public.fav_users OWNER TO flibusta;
+ALTER TABLE public.fav_users OWNER TO :FLIBUSTA_DBUSER;
 
 --
 -- TOC entry 204 (class 1259 OID 16530)
@@ -174,7 +174,7 @@ CREATE TABLE public.libaannotations (
 );
 
 
-ALTER TABLE public.libaannotations OWNER TO flibusta;
+ALTER TABLE public.libaannotations OWNER TO :FLIBUSTA_DBUSER;
 
 --
 -- TOC entry 205 (class 1259 OID 16536)
@@ -188,7 +188,7 @@ CREATE TABLE public.libapics (
 );
 
 
-ALTER TABLE public.libapics OWNER TO flibusta;
+ALTER TABLE public.libapics OWNER TO :FLIBUSTA_DBUSER;
 
 --
 -- TOC entry 206 (class 1259 OID 16539)
@@ -202,7 +202,7 @@ CREATE TABLE public.libavtor (
 );
 
 
-ALTER TABLE public.libavtor OWNER TO flibusta;
+ALTER TABLE public.libavtor OWNER TO :FLIBUSTA_DBUSER;
 
 --
 -- TOC entry 207 (class 1259 OID 16545)
@@ -216,7 +216,7 @@ CREATE TABLE public.libavtoraliase (
 );
 
 
-ALTER TABLE public.libavtoraliase OWNER TO flibusta;
+ALTER TABLE public.libavtoraliase OWNER TO :FLIBUSTA_DBUSER;
 
 --
 -- TOC entry 208 (class 1259 OID 16550)
@@ -231,7 +231,7 @@ CREATE SEQUENCE public.libavtoraliase_aliaseid_seq
     CACHE 1;
 
 
-ALTER TABLE public.libavtoraliase_aliaseid_seq OWNER TO flibusta;
+ALTER TABLE public.libavtoraliase_aliaseid_seq OWNER TO :FLIBUSTA_DBUSER;
 
 --
 -- TOC entry 3280 (class 0 OID 0)
@@ -261,7 +261,7 @@ CREATE TABLE public.libavtorname (
 );
 
 
-ALTER TABLE public.libavtorname OWNER TO flibusta;
+ALTER TABLE public.libavtorname OWNER TO :FLIBUSTA_DBUSER;
 
 --
 -- TOC entry 210 (class 1259 OID 16565)
@@ -276,7 +276,7 @@ CREATE SEQUENCE public.libavtorname_avtorid_seq
     CACHE 1;
 
 
-ALTER TABLE public.libavtorname_avtorid_seq OWNER TO flibusta;
+ALTER TABLE public.libavtorname_avtorid_seq OWNER TO :FLIBUSTA_DBUSER;
 
 --
 -- TOC entry 3281 (class 0 OID 0)
@@ -298,7 +298,7 @@ CREATE TABLE public.libavtorname_ts (
 );
 
 
-ALTER TABLE public.libavtorname_ts OWNER TO flibusta;
+ALTER TABLE public.libavtorname_ts OWNER TO :FLIBUSTA_DBUSER;
 
 --
 -- TOC entry 212 (class 1259 OID 16573)
@@ -313,7 +313,7 @@ CREATE TABLE public.libbannotations (
 );
 
 
-ALTER TABLE public.libbannotations OWNER TO flibusta;
+ALTER TABLE public.libbannotations OWNER TO :FLIBUSTA_DBUSER;
 
 --
 -- TOC entry 213 (class 1259 OID 16579)
@@ -346,7 +346,7 @@ CREATE TABLE public.libbook (
 );
 
 
-ALTER TABLE public.libbook OWNER TO flibusta;
+ALTER TABLE public.libbook OWNER TO :FLIBUSTA_DBUSER;
 
 --
 -- TOC entry 214 (class 1259 OID 16601)
@@ -361,7 +361,7 @@ CREATE SEQUENCE public.libbook_bookid_seq
     CACHE 1;
 
 
-ALTER TABLE public.libbook_bookid_seq OWNER TO flibusta;
+ALTER TABLE public.libbook_bookid_seq OWNER TO :FLIBUSTA_DBUSER;
 
 --
 -- TOC entry 3282 (class 0 OID 0)
@@ -383,7 +383,7 @@ CREATE TABLE public.libbook_ts (
 );
 
 
-ALTER TABLE public.libbook_ts OWNER TO flibusta;
+ALTER TABLE public.libbook_ts OWNER TO :FLIBUSTA_DBUSER;
 
 --
 -- TOC entry 216 (class 1259 OID 16609)
@@ -397,7 +397,7 @@ CREATE TABLE public.libbpics (
 );
 
 
-ALTER TABLE public.libbpics OWNER TO flibusta;
+ALTER TABLE public.libbpics OWNER TO :FLIBUSTA_DBUSER;
 
 --
 -- TOC entry 217 (class 1259 OID 16612)
@@ -410,7 +410,7 @@ CREATE TABLE public.libfilename (
 );
 
 
-ALTER TABLE public.libfilename OWNER TO flibusta;
+ALTER TABLE public.libfilename OWNER TO :FLIBUSTA_DBUSER;
 
 --
 -- TOC entry 218 (class 1259 OID 16615)
@@ -424,7 +424,7 @@ CREATE TABLE public.libgenre (
 );
 
 
-ALTER TABLE public.libgenre OWNER TO flibusta;
+ALTER TABLE public.libgenre OWNER TO :FLIBUSTA_DBUSER;
 
 --
 -- TOC entry 219 (class 1259 OID 16620)
@@ -439,7 +439,7 @@ CREATE SEQUENCE public.libgenre_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.libgenre_id_seq OWNER TO flibusta;
+ALTER TABLE public.libgenre_id_seq OWNER TO :FLIBUSTA_DBUSER;
 
 --
 -- TOC entry 3283 (class 0 OID 0)
@@ -463,7 +463,7 @@ CREATE TABLE public.libgenrelist (
 );
 
 
-ALTER TABLE public.libgenrelist OWNER TO flibusta;
+ALTER TABLE public.libgenrelist OWNER TO :FLIBUSTA_DBUSER;
 
 --
 -- TOC entry 221 (class 1259 OID 16628)
@@ -478,7 +478,7 @@ CREATE SEQUENCE public.libgenrelist_genreid_seq
     CACHE 1;
 
 
-ALTER TABLE public.libgenrelist_genreid_seq OWNER TO flibusta;
+ALTER TABLE public.libgenrelist_genreid_seq OWNER TO :FLIBUSTA_DBUSER;
 
 --
 -- TOC entry 3284 (class 0 OID 0)
@@ -503,7 +503,7 @@ CREATE TABLE public.libjoinedbooks (
 );
 
 
-ALTER TABLE public.libjoinedbooks OWNER TO flibusta;
+ALTER TABLE public.libjoinedbooks OWNER TO :FLIBUSTA_DBUSER;
 
 --
 -- TOC entry 223 (class 1259 OID 16636)
@@ -518,7 +518,7 @@ CREATE SEQUENCE public.libjoinedbooks_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.libjoinedbooks_id_seq OWNER TO flibusta;
+ALTER TABLE public.libjoinedbooks_id_seq OWNER TO :FLIBUSTA_DBUSER;
 
 --
 -- TOC entry 3285 (class 0 OID 0)
@@ -542,7 +542,7 @@ CREATE TABLE public.librate (
 );
 
 
-ALTER TABLE public.librate OWNER TO flibusta;
+ALTER TABLE public.librate OWNER TO :FLIBUSTA_DBUSER;
 
 --
 -- TOC entry 225 (class 1259 OID 16641)
@@ -557,7 +557,7 @@ CREATE TABLE public.librecs (
 );
 
 
-ALTER TABLE public.librecs OWNER TO flibusta;
+ALTER TABLE public.librecs OWNER TO :FLIBUSTA_DBUSER;
 
 --
 -- TOC entry 226 (class 1259 OID 16644)
@@ -572,7 +572,7 @@ CREATE SEQUENCE public.librecs_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.librecs_id_seq OWNER TO flibusta;
+ALTER TABLE public.librecs_id_seq OWNER TO :FLIBUSTA_DBUSER;
 
 --
 -- TOC entry 3286 (class 0 OID 0)
@@ -596,7 +596,7 @@ CREATE TABLE public.libreviews (
 );
 
 
-ALTER TABLE public.libreviews OWNER TO flibusta;
+ALTER TABLE public.libreviews OWNER TO :FLIBUSTA_DBUSER;
 
 --
 -- TOC entry 228 (class 1259 OID 16652)
@@ -612,7 +612,7 @@ CREATE TABLE public.libseq (
 );
 
 
-ALTER TABLE public.libseq OWNER TO flibusta;
+ALTER TABLE public.libseq OWNER TO :FLIBUSTA_DBUSER;
 
 --
 -- TOC entry 235 (class 1259 OID 34060)
@@ -625,7 +625,7 @@ CREATE TABLE public.libseqname (
 );
 
 
-ALTER TABLE public.libseqname OWNER TO flibusta;
+ALTER TABLE public.libseqname OWNER TO :FLIBUSTA_DBUSER;
 
 --
 -- TOC entry 229 (class 1259 OID 16663)
@@ -638,7 +638,7 @@ CREATE TABLE public.libseqname_ts (
 );
 
 
-ALTER TABLE public.libseqname_ts OWNER TO flibusta;
+ALTER TABLE public.libseqname_ts OWNER TO :FLIBUSTA_DBUSER;
 
 --
 -- TOC entry 230 (class 1259 OID 16669)
@@ -651,7 +651,7 @@ CREATE TABLE public.libsrclang (
 );
 
 
-ALTER TABLE public.libsrclang OWNER TO flibusta;
+ALTER TABLE public.libsrclang OWNER TO :FLIBUSTA_DBUSER;
 
 --
 -- TOC entry 231 (class 1259 OID 16672)
@@ -665,7 +665,7 @@ CREATE TABLE public.libtranslator (
 );
 
 
-ALTER TABLE public.libtranslator OWNER TO flibusta;
+ALTER TABLE public.libtranslator OWNER TO :FLIBUSTA_DBUSER;
 
 --
 -- TOC entry 239 (class 1259 OID 257812)
@@ -679,7 +679,7 @@ CREATE TABLE public.progress (
 );
 
 
-ALTER TABLE public.progress OWNER TO flibusta;
+ALTER TABLE public.progress OWNER TO :FLIBUSTA_DBUSER;
 
 --
 -- TOC entry 232 (class 1259 OID 16684)
@@ -693,7 +693,7 @@ CREATE TABLE public.seq (
 );
 
 
-ALTER TABLE public.seq OWNER TO flibusta;
+ALTER TABLE public.seq OWNER TO :FLIBUSTA_DBUSER;
 
 --
 -- TOC entry 233 (class 1259 OID 16687)
@@ -707,7 +707,7 @@ CREATE TABLE public.seqname (
 );
 
 
-ALTER TABLE public.seqname OWNER TO flibusta;
+ALTER TABLE public.seqname OWNER TO :FLIBUSTA_DBUSER;
 
 --
 -- TOC entry 234 (class 1259 OID 16698)
@@ -721,7 +721,7 @@ CREATE TABLE public.translation (
 );
 
 
-ALTER TABLE public.translation OWNER TO flibusta;
+ALTER TABLE public.translation OWNER TO :FLIBUSTA_DBUSER;
 
 --
 -- TOC entry 3001 (class 2604 OID 16707)

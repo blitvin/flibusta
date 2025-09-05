@@ -32,5 +32,8 @@ if ($handle = opendir('/application/flibusta')) {
 		echo "\n";
 	}
 	$dbh->commit();
+	$stmt = $dbh->prepare("update libbook b set deleted='1' where not exists (select 1 from book_zip z where b.bookid between start_id and end_id);");
+	$stmt->execute();
+	echo "Найдено ".$stmt->rowCount() . " книг не в файлах, они помечены как удаленные\n";
 	closedir($handle);
 }

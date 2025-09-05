@@ -36,53 +36,59 @@ function str_replace_first($from, $to, $content) {
 $ext = strtolower(trim($book->filetype));
 
 if ($ext == 'fb2') {
-	$stmt = $dbh->prepare("SELECT * FROM book_zip WHERE $url->var1 BETWEEN start_id AND end_id AND usr=0");
+	$stmt = $dbh->prepare("SELECT * FROM book_zip WHERE ? BETWEEN start_id AND end_id AND usr=0");
 } else {
-	$stmt = $dbh->prepare("SELECT * FROM book_zip WHERE $url->var1 BETWEEN start_id AND end_id AND usr=1");
+	$stmt = $dbh->prepare("SELECT * FROM book_zip WHERE ? BETWEEN start_id AND end_id AND usr=1");
 }
-$stmt->execute();
-$zip_name = $stmt->fetch()->filename;
-$zip = new ZipArchive(); 
+$stmt->execute([$url->var1]);
+if ($stmt->rowCount() >0 ){
+	$zip_name = $stmt->fetch()->filename;
+	$zip = new ZipArchive(); 
 
-echo "<div id='reader' class='reader'>";
-if ($zip->open(ROOT_PATH . "flibusta/" . $zip_name)) {
-	if ($ext == 'fb2') {
-		include('fb.php');
+	echo "<div id='reader' class='reader'>";
+	if ($zip->open(ROOT_PATH . "flibusta/" . $zip_name) === TRUE) {
+		if ($ext == 'fb2') {
+			include('fb.php');
+		}
+
+		if ($ext == 'txt') {
+			include('txt.php');
+		}
+
+		if ($ext == 'epub') {
+			include('epub.php');
+		}
+
+		if ($ext == 'pdf') {
+			include('pdf.php');
+		}
+
+		if ($ext == 'mobi') {
+			include('mobi.php');
+		}
+
+		if (($ext == 'djvu') || ($ext == 'djv')) {
+			include('djvu.php');
+		}
+
+		if ($ext == 'rtf') {
+			include('rtf.php');
+		}
+
+		if ($ext == 'docx') {
+			include('docx.php');
+		}
+
+		if (($ext == 'html') || ($ext == 'htm')) {
+			include('html.php');
+		}
+
+		$zip->close();
+	} else {
+		echo "<p><b><center> Не удалось открыть архив $zipname ,Ошибка ".$zip->getStatusString()."</center></b></p>\n";
 	}
-
-	if ($ext == 'txt') {
-		include('txt.php');
-	}
-
-	if ($ext == 'epub') {
-		include('epub.php');
-	}
-
-	if ($ext == 'pdf') {
-		include('pdf.php');
-	}
-
-	if ($ext == 'mobi') {
-		include('mobi.php');
-	}
-
-	if (($ext == 'djvu') || ($ext == 'djv')) {
-		include('djvu.php');
-	}
-
-	if ($ext == 'rtf') {
-		include('rtf.php');
-	}
-
-	if ($ext == 'docx') {
-		include('docx.php');
-	}
-
-	if (($ext == 'html') || ($ext == 'htm')) {
-		include('html.php');
-	}
-
-	$zip->close();
+} else {
+	echo "<p><b><center>Не удалось открыть книгу № ". $url->var1 . " , вероятно zip файл с книгой отсутсвует</center></b></p>\n";
 }
 
 

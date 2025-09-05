@@ -25,14 +25,14 @@ fi
 
 eval $zipchkcmd cache/lib.a.attached.zip
 res=$?
-if test "$res" == "0"; then
+if [ "$res" = "0" ]; then
    echo "Remove backup lib.a.attached.zip"
    rm cache/lib.a.attached.zip.old
 fi
 
 eval $zipchkcmd cache/lib.b.attached.zip
 res=$?
-if test "$res" == "0"; then
+if [ "$res" = "0" ]; then
    echo "Remove backup lib.b.attached.zip"
    rm cache/lib.b.attached.zip.old
 fi
