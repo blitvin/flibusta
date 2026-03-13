@@ -46,7 +46,7 @@ if ($stmt->rowCount() >0 ){
 	$zip = new ZipArchive(); 
 
 	echo "<div id='reader' class='reader'>";
-	if ($zip->open(ROOT_PATH . "flibusta/" . $zip_name) === TRUE) {
+	if ($zip->open(LIBRARY_PATH . $zip_name) === TRUE) {
 		if ($ext == 'fb2') {
 			include('fb.php');
 		}

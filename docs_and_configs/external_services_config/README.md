@@ -40,7 +40,7 @@ allow 192.168.1.0/24;
 3. Добавьте (предпологается что конфигурация внутри докера находится в /config/nginx, если нет, например часто бывает /etc/etc/config/nginx , соответственно измените  mount) 
 
 ```
-- <path to flibusta>/flibusta/application/tools/external_services_config/flibusta.conf:/config/nginx/flibusta.conf:v,ro
+- <path to flibusta>/docs_and_configs/external_services_config/flibusta.conf:/config/nginx/flibusta.conf:v,ro
 ```
   и сделайте   include конфиг файла flibusta.conf в  server блок в конфигурации nginx, скорее всего конфигурация находится в /config/nginx/site-confs/default.conf  или /etc/config/nginx/site-conf/default.conf 
 

@@ -263,8 +263,10 @@ function book_info_pg($book, $webroot = '', $full = false) {
 	echo "</div></div>\n";
 }
 
-date_default_timezone_set('Europe/Minsk');
-date_default_timezone_set('Etc/GMT-3');
+//date_default_timezone_set('Europe/Minsk');
+//date_default_timezone_set('Etc/GMT-3');
+$mytimezone = getenv('TZ')?getenv('TZ'):'UTC';
+date_default_timezone_set($mytimezone);
 setlocale(LC_ALL, 'rus_RUS');
 
 $m_time = explode(" ",microtime());

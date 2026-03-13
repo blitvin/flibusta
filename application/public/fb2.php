@@ -27,7 +27,7 @@ $stmt->execute();
 $zip_name = $stmt->fetch()->filename;
 $zip = new ZipArchive();
 
-if ($zip->open(ROOT_PATH . "flibusta/" . $zip_name)) {
+if ($zip->open(LIBRARY_PATH . $zip_name)) {
 	$filename = $book->author_name . " - " . $book->booktitle . " " . $id . ".fb2";
 	header('Content-Description: File Transfer');
 	header('Content-Type: application/octet-stream');

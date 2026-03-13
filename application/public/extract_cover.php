@@ -49,13 +49,13 @@ $iid = $id;
 header("Content-type: image/jpeg");
 
 if ($small) {
-	if (file_exists(ROOT_PATH . "cache/covers/$id-small.jpg")) {
-		lastm(ROOT_PATH . "cache/covers/$id-small.jpg");
+	if (file_exists( CACHE_PATH . "covers/$id-small.jpg")) {
+		lastm( CACHE_PATH . "covers/$id-small.jpg");
 		die();
 	}
 } else {
-	if (file_exists(ROOT_PATH . "cache/covers/$id.jpg")) {
-		lastm(ROOT_PATH . "cache/covers/$id.jpg");
+	if (file_exists(CACHE_PATH . "covers/$id.jpg")) {
+		lastm(CACHE_PATH . "covers/$id.jpg");
 		die();
 	}
 }
@@ -66,16 +66,16 @@ $f = $stmt->fetch();
 
 if (isset($f->file)) {
 	$zip = new ZipArchive(); 
-	if ($zip->open(ROOT_PATH . "cache/lib.b.attached.zip")) {
+	if ($zip->open(CACHE_PATH . "lib.b.attached.zip")) {
 		$f = $zip->getFromName($f->file);
 		if (strlen($f) > 0) {
-			file_put_contents(ROOT_PATH . "cache/covers/$id.jpg", $f);
+			file_put_contents(CACHE_PATH . "covers/$id.jpg", $f);
 			$thm = resizeCover($f, 300, 400);
-			imagejpeg($thm, ROOT_PATH . "cache/covers/$id-small.jpg", 75);
-			imagedestroy($thm);
+			imagejpeg($thm, CACHE_PATH . "covers/$id-small.jpg", 75);
+			unset($thm);
 			if ($small) {
-				if (file_exists(ROOT_PATH . "cache/covers/$id-small.jpg")) {
-					lastm(ROOT_PATH . "cache/covers/$id-small.jpg");
+				if (file_exists(CACHE_PATH . "covers/$id-small.jpg")) {
+					lastm(CACHE_PATH . "covers/$id-small.jpg");
 				die();
 				}
 			} else {
@@ -113,7 +113,7 @@ if ($filename == '') {
 	$filename = trim("$id.$type");
 }
 
-if ($zip->open(ROOT_PATH . "flibusta/" . $zip_name)) {
+if ($zip->open(LIBRARY_PATH . $zip_name)) {
 	$f = $zip->getFromName("$filename");
 }
 
@@ -138,13 +138,13 @@ if ($type == 'fb2') {
 }
 
 if ($type == 'epub') {
-	file_put_contents(ROOT_PATH . "cache/tmp/$iid.tmp", $f);
+	file_put_contents(CACHE_PATH . "tmp/$iid.tmp", $f);
 	include('/application/epub.php');
-	$d = new EPub(ROOT_PATH . "cache/tmp/$iid.tmp");
+	$d = new EPub(CACHE_PATH . "tmp/$iid.tmp");
 	$im = $d->Cover();
 	if ($im['found'] != '') {
 		$cover = $im['data'];
-		unlink(ROOT_PATH . "cache/tmp/$iid.tmp");
+		unlink(CACHE_PATH . "tmp/$iid.tmp");
 	} else {
 		echo file_get_contents('/application/none.jpg');
 	}
@@ -155,15 +155,15 @@ if (strlen($cover) < 100) {
 	echo $cover;
 	die();
 } else {
-	file_put_contents(ROOT_PATH . "cache/covers/$iid.jpg", $cover);
+	file_put_contents(CACHE_PATH . "covers/$iid.jpg", $cover);
 	$thm = resizeCover($cover, 300, 400);
-	imagejpeg($thm, ROOT_PATH . "cache/covers/$iid-small.jpg", 75);
-	imagedestroy($thm);
+	imagejpeg($thm, CACHE_PATH . "covers/$iid-small.jpg", 75);
+	unset($thm);
 }
 
 if ($small) {
-	if (file_exists(ROOT_PATH . "cache/covers/$iid-small.jpg")) {
-		lastm(ROOT_PATH . "cache/covers/$iid-small.jpg");
+	if (file_exists(CACHE_PATH . "covers/$iid-small.jpg")) {
+		lastm(CACHE_PATH . "covers/$iid-small.jpg");
 		die();
 	}
 } else {

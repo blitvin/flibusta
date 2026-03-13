@@ -1,39 +1,23 @@
 #!/bin/sh
 
-#zipchkcdm='zip -T'
-zipchkcmd='7z -bsp0 -bso0 t'
+ADMINOPLOCKFILE=/cache/adminop.lock
 
-echo "Backup old zip files"
-mv cache/lib.a.attached.zip cache/lib.a.attached.zip.old
-mv cache/lib.b.attached.zip cache/lib.b.attached.zip.old
+echo "getcovers.sh : start running" >&2
 
-wget --directory-prefix=cache -c -nc https://flibusta.is/sql/lib.a.attached.zip
-res=$?
-if test "$res" != "0"; then
-   echo "the wget command failed with: $res"
-   echo "Restore lib.a.attached.zip"
-   mv cache/lib.a.attached.zip.old cache/lib.a.attached.zip
-fi
-wget --directory-prefix=cache -c -nc https://flibusta.is/sql/lib.b.attached.zip
-res=$?
-if test "$res" != "0"; then
-   echo "the wget command failed with: $res"
-   echo "Restore lib.b.attached.zip"
-   mv cache/lib.b.attached.zip.old cache/lib.b.attached.zip
+exec 199> "$ADMINOPLOCKFILE"
+if ! flock -n 199; then
+  echo "getcovers.sh : failed to obtain admin op lock" >&2
+  exit 1;
 fi
 
 
-eval $zipchkcmd cache/lib.a.attached.zip
-res=$?
-if [ "$res" = "0" ]; then
-   echo "Remove backup lib.a.attached.zip"
-   rm cache/lib.a.attached.zip.old
-fi
 
-eval $zipchkcmd cache/lib.b.attached.zip
-res=$?
-if [ "$res" = "0" ]; then
-   echo "Remove backup lib.b.attached.zip"
-   rm cache/lib.b.attached.zip.old
-fi
 
+echo "Обновление lib.a.attached.zip"
+/tools/refresh_file.sh lib.a.attached.zip https://flibusta.is/sql/ /cache/ 'unzip -t'
+echo "Обновление lib.b.attached.zip"
+/tools/refresh_file.sh lib.b.attached.zip https://flibusta.is/sql/ /cache/ 'unzip -t'
+echo Обновление закончено
+date > /cache/timestamps/getcovers
+echo "getcovers.sh : finished" >&2
+exec 199>&-

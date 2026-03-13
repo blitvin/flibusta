@@ -25,8 +25,8 @@ $iid = $id;
 
 header("Content-type: image/jpeg");
 
-if (file_exists(ROOT_PATH . "cache/authors/$id.jpg")) {
-	lastm(ROOT_PATH . "cache/authors/$id.jpg");
+if (file_exists(CACHE_PATH . "authors/$id.jpg")) {
+	lastm(CACHE_PATH . "authors/$id.jpg");
 	die();
 }
 
@@ -36,10 +36,10 @@ $f = $stmt->fetch();
 
 if (isset($f->file)) {
 	$zip = new ZipArchive(); 
-	if ($zip->open(ROOT_PATH . "cache/lib.a.attached.zip")) {
+	if ($zip->open(CACHE_PATH . "lib.a.attached.zip")) {
 		$f = $zip->getFromName($f->file);
 		if (strlen($f) > 0) {
-			file_put_contents(ROOT_PATH . "cache/authors/$id.jpg", $f);
+			file_put_contents(CACHE_PATH . "authors/$id.jpg", $f);
 			echo $f;
 			die();
 		}

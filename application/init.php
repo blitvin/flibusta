@@ -1,5 +1,13 @@
 <?php
 define('ROOT_PATH', '/application/');
+define('CACHE_PATH', '/cache/');
+define('SQL_PATH', '/sql/');
+define('LIBRARY_PATH', '/flibusta/');
+define('LOCAL_LIBRARY_PATH', '/cache/local/');
+define('DBUPDATE_LOCK','/cache/dbupdate.lock');
+define('ADMINOPLOCKFILE','/cache/adminop.lock');
+define('ADMINOPSTATUSFILE','/cache/status');
+define('TIMESTAPS_PATH','/cache/timestamps/');
 define('RECORDS_PAGE', 10);
 define('BOOKS_PAGE', 10);
 define('AUTHORS_PAGE', 50);

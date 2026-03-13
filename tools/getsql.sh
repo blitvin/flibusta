@@ -1,19 +1,52 @@
 #!/bin/sh
-wget --directory-prefix=FlibustaSQL -c -nc http://flibusta.is/sql/lib.libavtor.sql.gz
-wget --directory-prefix=FlibustaSQL -c -nc http://flibusta.is/sql/lib.libtranslator.sql.gz
-wget --directory-prefix=FlibustaSQL -c -nc http://flibusta.is/sql/lib.libavtorname.sql.gz
-wget --directory-prefix=FlibustaSQL -c -nc http://flibusta.is/sql/lib.libbook.sql.gz
-wget --directory-prefix=FlibustaSQL -c -nc http://flibusta.is/sql/lib.libfilename.sql.gz
-wget --directory-prefix=FlibustaSQL -c -nc http://flibusta.is/sql/lib.libgenre.sql.gz
-wget --directory-prefix=FlibustaSQL -c -nc http://flibusta.is/sql/lib.libgenrelist.sql.gz
-wget --directory-prefix=FlibustaSQL -c -nc http://flibusta.is/sql/lib.libjoinedbooks.sql.gz
-wget --directory-prefix=FlibustaSQL -c -nc http://flibusta.is/sql/lib.librate.sql.gz
-wget --directory-prefix=FlibustaSQL -c -nc http://flibusta.is/sql/lib.librecs.sql.gz
-wget --directory-prefix=FlibustaSQL -c -nc http://flibusta.is/sql/lib.libseqname.sql.gz
-wget --directory-prefix=FlibustaSQL -c -nc http://flibusta.is/sql/lib.libseq.sql.gz
-wget --directory-prefix=FlibustaSQL -c -nc http://flibusta.is/sql/lib.reviews.sql.gz
-wget --directory-prefix=FlibustaSQL -c -nc http://flibusta.is/sql/lib.b.annotations.sql.gz
-wget --directory-prefix=FlibustaSQL -c -nc http://flibusta.is/sql/lib.a.annotations.sql.gz
-wget --directory-prefix=FlibustaSQL -c -nc http://flibusta.is/sql/lib.b.annotations_pics.sql.gz
-wget --directory-prefix=FlibustaSQL -c -nc http://flibusta.is/sql/lib.a.annotations_pics.sql.gz
-docker exec $(docker ps -q --filter "ancestor=flibusta_php-fpm") /application/tools/app_import_sql.sh
+
+ADMINOPLOCKFILE=/cache/adminop.lock
+
+echo "getsql.sh : start running" >&2
+
+exec 199> "$ADMINOPLOCKFILE"
+if ! flock -n 199; then
+  echo "getsql.sh : failed to obtain admin op lock" >&2
+  exit 1;
+fi
+
+
+echo Updating lib.libavtor.sql.gz
+/tools/refresh_file.sh  lib.libavtor.sql.gz https://flibusta.is/sql/ /sql/
+echo Updating lib.libtranslator.sql.gz
+/tools/refresh_file.sh  lib.libtranslator.sql.gz https://flibusta.is/sql/ /sql/
+echo Updating lib.libavtorname.sql.gz
+/tools/refresh_file.sh  lib.libavtorname.sql.gz https://flibusta.is/sql/ /sql/
+echo Updating lib.libbook.sql.gz
+/tools/refresh_file.sh  lib.libbook.sql.gz https://flibusta.is/sql/ /sql/
+echo Updating lib.libfilename.sql.gz
+/tools/refresh_file.sh  lib.libfilename.sql.gz https://flibusta.is/sql/ /sql/
+echo Updating lib.libgenre.sql.gz
+/tools/refresh_file.sh  lib.libgenre.sql.gz https://flibusta.is/sql/ /sql/
+echo Updating lib.libgenrelist.sql.gz
+/tools/refresh_file.sh  lib.libgenrelist.sql.gz https://flibusta.is/sql/ /sql/
+echo Updating lib.libjoinedbooks.sql.gz
+/tools/refresh_file.sh  lib.libjoinedbooks.sql.gz https://flibusta.is/sql/ /sql/
+echo Updating lib.librate.sql.gz
+/tools/refresh_file.sh  lib.librate.sql.gz https://flibusta.is/sql/ /sql/
+echo Updating lib.librecs.sql.gz
+/tools/refresh_file.sh  lib.librecs.sql.gz https://flibusta.is/sql/ /sql/
+echo Updating lib.libseqname.sql.gz
+/tools/refresh_file.sh  lib.libseqname.sql.gz https://flibusta.is/sql/ /sql/
+echo Updating lib.libseq.sql.gz
+/tools/refresh_file.sh  lib.libseq.sql.gz https://flibusta.is/sql/ /sql/
+echo Updating lib.reviews.sql.gz
+/tools/refresh_file.sh  lib.reviews.sql.gz https://flibusta.is/sql/ /sql/
+echo Updating lib.b.annotations.sql.gz
+/tools/refresh_file.sh  lib.b.annotations.sql.gz https://flibusta.is/sql/ /sql/
+echo Updating lib.a.annotations.sql.gz
+/tools/refresh_file.sh  lib.a.annotations.sql.gz https://flibusta.is/sql/ /sql/
+echo Updating lib.b.annotations_pics.sql.gz
+/tools/refresh_file.sh  lib.b.annotations_pics.sql.gz https://flibusta.is/sql/ /sql/
+echo Updating lib.a.annotations_pics.sql.gz
+/tools/refresh_file.sh  lib.a.annotations_pics.sql.gz https://flibusta.is/sql/ /sql/
+echo Done
+date > /cache/timestamps/getsql
+echo "getsql.sh : finished" >&2
+exec 199>&-
+

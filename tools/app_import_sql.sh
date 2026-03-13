@@ -1,40 +1,59 @@
 #!/bin/sh
-source /application/tools/dbinit.sh
 
-mkdir -p /application/sql/psql
-mkdir -p /application/cache/authors
-mkdir -p /application/cache/covers
-mkdir -p /application/cache/tmp
+ADMINOPLOCKFILE=/cache/adminop.lock
+DBLOCKFILE=/cache/dbupdate.lock
 
-echo "Распаковка sql.gz">/application/sql/status
-gzip -f -d /application/sql/*.gz
+echo "app_import_sql.sh : start running" >&2
 
-/application/tools/app_topg lib.a.annotations_pics.sql
-/application/tools/app_topg lib.b.annotations_pics.sql
-/application/tools/app_topg lib.a.annotations.sql
-/application/tools/app_topg lib.b.annotations.sql
-/application/tools/app_topg lib.libavtorname.sql
-/application/tools/app_topg lib.libavtor.sql
-/application/tools/app_topg lib.libbook.sql
-/application/tools/app_topg lib.libfilename.sql
-/application/tools/app_topg lib.libgenrelist.sql
-/application/tools/app_topg lib.libgenre.sql
-/application/tools/app_topg lib.libjoinedbooks.sql
-/application/tools/app_topg lib.librate.sql
-/application/tools/app_topg lib.librecs.sql
-/application/tools/app_topg lib.libseqname.sql
-/application/tools/app_topg lib.libseq.sql
-/application/tools/app_topg lib.libtranslator.sql
-/application/tools/app_topg lib.reviews.sql
+exec 199> "$ADMINOPLOCKFILE"
+if ! flock -n 199; then
+  echo "app_import_sql.sh : failed to obtain admin op lock" >&2
+  exit 1;
+fi
 
-echo "Подчистка БД. Стираем авторов, серии и жанры у которых нет ни одной книги" >>/application/sql/status
-$SQL_CMD -f /application/tools/cleanup_db.sql
+exec 200> "$DBLOCKFILE"
+if ! flock -w 30 200; then
+  echo "app_import_sql.sh : failed to obtain db op lock" >&2
+  exit 1
+fi
 
-echo "Обновление полнотекстовых индексов">>/application/sql/status
-$SQL_CMD -f /application/tools/update_vectors.sql
+source /tools/dbinit.sh
 
-echo "Создание индекса zip-файлов">>/application/sql/status
-php /application/tools/app_update_zip_list.php
+mkdir -p /sql/psql
+mkdir -p /cache/authors
+mkdir -p /cache/covers
+mkdir -p /cache/tmp
 
-echo "">/application/sql/status
+echo "Распаковка sql.gz"
+gzip -f -d /sql/*.gz
 
+/tools/app_topg lib.a.annotations_pics.sql > /cache/log/dbupdate.log
+/tools/app_topg lib.b.annotations_pics.sql >> /cache/log/dbupdate.log
+/tools/app_topg lib.a.annotations.sql >> /cache/log/dbupdate.log
+/tools/app_topg lib.b.annotations.sql >> /cache/log/dbupdate.log
+/tools/app_topg lib.libavtorname.sql >> /cache/log/dbupdate.log
+/tools/app_topg lib.libavtor.sql >> /cache/log/dbupdate.log
+/tools/app_topg lib.libbook.sql >> /cache/log/dbupdate.log
+/tools/app_topg lib.libfilename.sql >> /cache/log/dbupdate.log
+/tools/app_topg lib.libgenrelist.sql >> /cache/log/dbupdate.log
+/tools/app_topg lib.libgenre.sql >> /cache/log/dbupdate.log
+/tools/app_topg lib.libjoinedbooks.sql >> /cache/log/dbupdate.log
+/tools/app_topg lib.librate.sql >> /cache/log/dbupdate.log
+/tools/app_topg lib.librecs.sql >> /cache/log/dbupdate.log
+/tools/app_topg lib.libseqname.sql >> /cache/log/dbupdate.log
+/tools/app_topg lib.libseq.sql >> /cache/log/dbupdate.log
+/tools/app_topg lib.libtranslator.sql >> /cache/log/dbupdate.log
+/tools/app_topg lib.reviews.sql >> /cache/log/dbupdate.log
+
+#echo "Подчистка БД. Стираем авторов, серии и жанры у которых нет ни одной книги"
+#$SQL_CMD -f /tools/cleanup_db.sql
+
+echo "Обновление полнотекстовых индексов"
+$SQL_CMD -f /tools/update_vectors.sql >> /cache/log/dbupdate.log
+
+echo "Создание индекса zip-файлов"
+php /tools/app_update_zip_list.php  >> /cache/log/dbupdate.log
+
+echo "app_import_sql.sh : finished" >&2 
+exec 200>&-
+exec 199>&~

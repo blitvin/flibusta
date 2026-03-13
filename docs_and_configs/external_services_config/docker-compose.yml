@@ -11,26 +11,20 @@ services:
            - FLIBUSTA_WEBROOT=/mylib
            - FLIBUSTA_DBUSER=flibusta
            - FLIBUSTA_DBNAME=flibusta
-           - FLIBUSTA_DBTYPE=postgres
            - FLIBUSTA_DBHOST=postgresdb
            - FLIBUSTA_DBPASSWORD_FILE=/run/secrets/FLIBUSTA_PWD
            - POSTGRES_ADMIN_USER=postgres
            - POSTGRES_ADMIN_DBPASSWORD_FILE=/run/secrets/POSTGRES_ADMIN_PWD
            - DB_HOST_PINGS=3
-        command: /application/tools/external_services_config/flibusta_entrypoint.sh
+        command: /tools/flibusta_entrypoint.sh
         networks:
            flibusta_net:
              ipv4_address: 172.101.0.101
            postgres_db_net:
         volumes:
-            - './application:/application'
-            - './cache:/application/cache'
-            - './Flibusta.Net:/application/flibusta'
-            - './FlibustaSQL:/application/sql'
-            - './phpdocker/php-fpm/php-ini-overrides.ini:/usr/local/etc/php/conf.d/local-custom.ini'
-            - './phpdocker/php-fpm/php-fpm.conf:/usr/local/etc/php-fpm.d/zz-php-fpm.conf'
-            - './FlibustaSQL/lib.a.attached.zip:/application/cache/lib.a.attached.zip:ro'
-            - './FlibustaSQL/lib.b.attached.zip:/application/cache/lib.b.attached.zip:ro'
+            - './cache:/cache'
+            - './Flibusta.Net:/flibusta'
+            - './FlibustaSQL:/sql'
         secrets:
             - FLIBUSTA_PWD
             - POSTGRES_ADMIN_PWD

@@ -1,5 +1,5 @@
 #!/bin/sh
-. /application/tools/dbinit.sh
+. /tools/dbinit.sh
 
 if [ -z "$DB_HOST_PINGS" ]; then
    DB_HOST_PINGS=3
@@ -48,7 +48,7 @@ if [ `$SQL_CMD -c "select 1 from pg_roles where rolname='flibusta'"  | wc -l` -e
         exit 1
     fi
 
-    psql -h $FLIBUSTA_DBHOST -d $POSTGRES_ADMIN_USER -U $POSTGRES_ADMIN_USER -v FLIBUSTA_DBUSER="$FLIBUSTA_DBUSER"  -v FLIBUSTA_DBPASSWORD="$FLIBUSTA_DBPASSWORD" -v FLIBUSTA_DBNAME="$FLIBUSTA_DBNAME" -f /application/tools/external_services_config/external_postgres_init.sql
+    psql -h $FLIBUSTA_DBHOST -d $POSTGRES_ADMIN_USER -U $POSTGRES_ADMIN_USER -v FLIBUSTA_DBUSER="$FLIBUSTA_DBUSER"  -v FLIBUSTA_DBPASSWORD="$FLIBUSTA_DBPASSWORD" -v FLIBUSTA_DBNAME="$FLIBUSTA_DBNAME" -f /tools/postgres_init.sql
     #restore flibusta password
     export PGPASSWORD=$FLIBUSTA_DBPASSWORD
 
@@ -56,6 +56,32 @@ if [ `$SQL_CMD -c "select 1 from pg_roles where rolname='flibusta'"  | wc -l` -e
         echo "Can't connect to the DB after initialization attempt, exiting"
         exit 1
     fi
+fi
+
+
+mkdir -p /sql/psql
+mkdir -p /cache/authors
+mkdir -p /cache/covers
+mkdir -p /cache/tmp
+mkdir -p /cache/etag
+mkdir -p /cache/local
+mkdir -p /cache/log
+mkdir -p /cache/timestamps
+
+touch /cache/dbupdate.lock
+touch /cache/adminop.lock
+touch /cache/timestamps/getcovers
+touch /cache/timestamps/getsql
+touch /cache/timestamps/app_reindex
+touch /cache/timestamps/update_daily
+
+chown -R www-data:www-data /sql/*
+chown -R www-data:www-data /cache/*
+
+
+if [ ! -d /flibusta ]; then
+echo FATAL: directory /flibusta with books is not found, exiting
+exit 1
 fi
 
 exec php-fpm
