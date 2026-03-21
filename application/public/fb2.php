@@ -7,6 +7,7 @@ if (isset($_GET['id'])) {
 error_reporting(E_ALL);
 include('../init.php');
 
+
 $stmt = $dbh->prepare("SELECT libbook.Title BookTitle, 
 	CONCAT(libavtorname.LastName, ' ', libavtorname.FirstName) author_name
 		FROM libbook 
@@ -27,7 +28,7 @@ $stmt->execute();
 $zip_name = $stmt->fetch()->filename;
 $zip = new ZipArchive();
 
-if ($zip->open(LIBRARY_PATH . $zip_name)) {
+if ($zip->open($zip_name)) {
 	$filename = $book->author_name . " - " . $book->booktitle . " " . $id . ".fb2";
 	header('Content-Description: File Transfer');
 	header('Content-Type: application/octet-stream');

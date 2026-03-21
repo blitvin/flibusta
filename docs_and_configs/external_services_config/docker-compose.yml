@@ -1,42 +1,39 @@
 services:
-
    flibusta-fpm:
-        build: phpdocker/php-fpm
+        image: blitvin/flibusta-at-home
         working_dir: /application
         container_name: flibusta-fpm
+        restart: unless-stopped
         environment:
-           - PUID=${APPUSER_PUID}
-           - PGID=${APPUSER_PGID}
            - TZ=${TIME_ZONE_VALUE}
            - FLIBUSTA_WEBROOT=/mylib
            - FLIBUSTA_DBUSER=flibusta
            - FLIBUSTA_DBNAME=flibusta
+           - FLIBUSTA_DBTYPE=postgres
            - FLIBUSTA_DBHOST=postgresdb
            - FLIBUSTA_DBPASSWORD_FILE=/run/secrets/FLIBUSTA_PWD
-           - POSTGRES_ADMIN_USER=postgres
            - POSTGRES_ADMIN_DBPASSWORD_FILE=/run/secrets/POSTGRES_ADMIN_PWD
-           - DB_HOST_PINGS=3
-        command: /tools/flibusta_entrypoint.sh
         networks:
            flibusta_net:
-             ipv4_address: 172.101.0.101
+             ipv4_address: {дайте адрес в сети докера}
            postgres_db_net:
         volumes:
-            - './cache:/cache'
-            - './Flibusta.Net:/flibusta'
-            - './FlibustaSQL:/sql'
+            - '${директория с zip файлами с книгами флибусты}:/flibusta:ro'
+            - '${директория в которую сервер будет слачивать dump БД Флибусты}:/sql'
+            - '${рабочая директория для использования локальным сервером Алибусты}:/cache'
         secrets:
             - FLIBUSTA_PWD
             - POSTGRES_ADMIN_PWD
 
 secrets:
    FLIBUSTA_PWD:
-      file: ./secrets/flibusta_pwd.txt
+      file: {директория с файлом в котором записан пароль DB user}/flibusta_pwd.txt
    POSTGRES_ADMIN_PWD:
-      file: ./secrets/postgres_admin_pwd.txt
+      file: {директория с файлом в котором записан пароль администратора DB}/postgres_admin_pwd.txt
 
 networks:
    postgres_db_net:
      external: true
    flibusta_net:
      external: true
+

@@ -1,3 +1,17 @@
+<?php
+if ($url->mod !== 'service') {
+	// check for db update - issue 503 status if update is in progress
+	$filehandle = fopen(DBUPDATE_LOCK,"r");
+	if (flock($filehandle,LOCK_SH|LOCK_NB) === false) {
+		header('Refresh: 30');
+		header('Content-Type: text/html; charset=utf-8');
+		http_response_code(503);
+		echo '<H1>В данный момент библиотека проходит техническое обслуживание и поэтому недоступна</H1> Пожалуйста подождите.';
+		echo 'Эта страница будет автоматически перезагружаться пока техобслуживание не закончмтся. После этого автоматически загрузится страница, которую Вы запросили.';
+		die();
+	}
+}
+?>
 <!doctype html>
 <html lang="ru">
 <head>
@@ -122,12 +136,20 @@ __HTML
 <div class="container whb">
 <br />
 <?php
-if (file_exists($url->module)) {
-//	echo "<h1>$url->title</h1>";
-	include($url->module);
-} else {
-	echo 'Раздел не найден', 'Вы ввели неверный адрес, либо раздел находится в разработке.';
-	header("HTTP/1.0 404 Not Found");
+try{
+	if (file_exists($url->module)) {
+	//	echo "<h1>$url->title</h1>";
+		include($url->module);
+	} else {
+		echo 'Раздел не найден', 'Вы ввели неверный адрес, либо раздел находится в разработке.';
+		header("HTTP/1.0 404 Not Found");
+	}
+}
+finally {
+		if ( isset($filehandle)) {
+			flock($filehandle,LOCK_UN);
+			fclose($filehandle);
+		}
 }
 ?>
 <div>&nbsp;</div>

@@ -46,7 +46,7 @@ if ($stmt->rowCount() >0 ){
 	$zip = new ZipArchive(); 
 
 	echo "<div id='reader' class='reader'>";
-	if ($zip->open(LIBRARY_PATH . $zip_name) === TRUE) {
+	if ($zip->open($zip_name) === TRUE) {
 		if ($ext == 'fb2') {
 			include('fb.php');
 		}
@@ -85,7 +85,7 @@ if ($stmt->rowCount() >0 ){
 
 		$zip->close();
 	} else {
-		echo "<p><b><center> Не удалось открыть архив $zipname ,Ошибка ".$zip->getStatusString()."</center></b></p>\n";
+		echo "<p><b><center> Не удалось открыть архив $zip_name ,Ошибка ".$zip->getStatusString()."</center></b></p>\n";
 	}
 } else {
 	echo "<p><b><center>Не удалось открыть книгу № ". $url->var1 . " , вероятно zip файл с книгой отсутсвует</center></b></p>\n";

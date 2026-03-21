@@ -13,7 +13,7 @@ VOLUME "/flibusta"
 VOLUME  "/cache"
 VOLUME  "/sql"
 
-RUN apk --no-cache add postgresql-client python3 coreutils flock
+RUN apk --no-cache add postgresql-client python3 coreutils flock tzdata
 
 RUN chmod +x /usr/local/bin/install-php-extensions; install-php-extensions gd bz2 pdo_pgsql zip
 CMD ["/tools/flibusta_entrypoint.sh"]

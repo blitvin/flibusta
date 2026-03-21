@@ -13,10 +13,11 @@ table=$(eval "$xtable")
 echo $1
 echo "TRUNCATE $table;">/sql/tmp.sql
 echo $table
+echo $table >> $2
 cat /sql/$1|grep INSERT|tr -d \`|sed "s/$table/$table/g">>/sql/tmp.sql
 /tools/app_db_converter.py /sql/tmp.sql /sql/psql/$1
 rm /sql/tmp.sql
 
 echo "Импорт $1"
-$SQL_CMD -f /sql/psql/$1
+$SQL_CMD -f /sql/psql/$1 >> $2
 

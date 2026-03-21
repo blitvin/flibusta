@@ -19,7 +19,10 @@ include(ROOT_PATH . 'dbinit.php');
 include_once(ROOT_PATH . 'webroot.php');
 session_set_cookie_params(3600 * 24 * 31 * 12,"/");
 #session_start();
-
+$tz =  getenv('TZ');
+if ($tz !== false){
+    date_default_timezone_set($tz);
+}
 error_reporting(E_ALL);
 
 $cdt = date('Y-m-d H:i:s');

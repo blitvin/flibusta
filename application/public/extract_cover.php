@@ -2,7 +2,7 @@
 include('../init.php');
 $cover = '';
 $q = 75;
-header('Cache-Control: public, max-age=86400');
+
 
 function resizeCover($filename, $newwidth, $newheight){
 	$i = imagecreatefromstring($filename);
@@ -46,8 +46,15 @@ if (isset($_GET['id'])) {
 }
 $iid = $id;
 
-header("Content-type: image/jpeg");
 
+// check whether DB is in the process of maintenance , return status 503 if yes
+$filehandle = fopen(DBUPDATE_LOCK,"r");
+if (flock($filehandle,LOCK_SH|LOCK_NB) === false) {
+	http_response_code(503);
+	die();
+}
+header("Content-type: image/jpeg");
+header('Cache-Control: public, max-age=86400');
 if ($small) {
 	if (file_exists( CACHE_PATH . "covers/$id-small.jpg")) {
 		lastm( CACHE_PATH . "covers/$id-small.jpg");
@@ -60,49 +67,69 @@ if ($small) {
 	}
 }
 
-$stmt = $dbh->prepare("SELECT file FROM libbpics WHERE BookId=$id");
+$stmt = $dbh->prepare("SELECT file FROM libbpics WHERE BookId=:id");
+$stmt->bindParam(":id",$id);
 $stmt->execute();
 $f = $stmt->fetch();
+if ($f !== false) {
 
 if (isset($f->file)) {
 	$zip = new ZipArchive(); 
 	if ($zip->open(CACHE_PATH . "lib.b.attached.zip")) {
-		$f = $zip->getFromName($f->file);
-		if (strlen($f) > 0) {
+		$fdata = $zip->getFromName($f->file);
+		if (strlen($fdata) > 0) {
 			file_put_contents(CACHE_PATH . "covers/$id.jpg", $f);
-			$thm = resizeCover($f, 300, 400);
+			$thm = resizeCover($fdata, 300, 400);
 			imagejpeg($thm, CACHE_PATH . "covers/$id-small.jpg", 75);
-			unset($thm);
+			$thm = null;
 			if ($small) {
 				if (file_exists(CACHE_PATH . "covers/$id-small.jpg")) {
 					lastm(CACHE_PATH . "covers/$id-small.jpg");
-				die();
+					die();
 				}
 			} else {
-				echo $f;
+				echo $fdata;
 				die();
 			}
 		}
 	}
 	$zip->close();
 }
-
-
-$stmt = $dbh->prepare("SELECT filetype FROM libbook WHERE bookid=$id LIMIT 1");
-$stmt->execute();
-$type = trim($stmt->fetch()->filetype);
-if ($type == 'fb2') {
-	$u = '0';
-} else {
-	$u = '1';
 }
-
-$stmt = $dbh->prepare("SELECT * FROM book_zip WHERE $id BETWEEN start_id AND end_id AND usr=$u");
+$stmt = false;
+$stmt = $dbh->prepare("SELECT filetype FROM libbook WHERE bookid=:id LIMIT 1");
+$stmt->bindParam(":id",$id);
 $stmt->execute();
-$zip_name = $stmt->fetch()->filename;
+$result = $stmt->fetch();
+if ($result !== false) {
+	$type = trim($result->filetype);
+	if ($type == 'fb2') {
+		$u = '0';
+	} else {
+		$u = '1';
+	}
+} else {
+	echo file_get_contents('/application/none.jpg');
+	die();
+}
+$stmt = null;
+$stmt = $dbh->prepare("SELECT filename FROM book_zip WHERE :id BETWEEN start_id AND end_id AND usr=$u");
+$stmt->bindParam(":id",$id);
+$stmt->execute();
+$result = $stmt->fetch();
+if (!$result){
+	echo file_get_contents('/application/none.jpg');
+	die();
+}
+$zip_name = $result->filename;
+$stmt = null;
+
 $zip = new ZipArchive(); 
 
-$result = $dbh->query("SELECT filename FROM libfilename where BookId=$id")->fetch();
+$stmt = $dbh->prepare("SELECT filename FROM libfilename where BookId=:id");
+$stmt->bindParam(":id",$id);
+
+$result = $stmt->fetch();
 
 if ($result) {
     $filename = $result->filename;
@@ -112,11 +139,18 @@ if ($result) {
 if ($filename == '') {
 	$filename = trim("$id.$type");
 }
-
-if ($zip->open(LIBRARY_PATH . $zip_name)) {
+$stmt = null;
+if ($zip->open($zip_name)) {
 	$f = $zip->getFromName("$filename");
+	if ($f === false){
+		echo file_get_contents('/application/none.jpg');
+		die();
+	}
+} else {
+	echo file_get_contents('/application/none.jpg');
+	die();
 }
-
+$zip->close();
 
 if ($type == 'fb2') {
 	$fb2 = simplexml_load_string($f);
@@ -134,7 +168,6 @@ if ($type == 'fb2') {
 			$images["$id"] = $binary;
 		}
 	}
-	$zip->close();
 }
 
 if ($type == 'epub') {
@@ -146,10 +179,9 @@ if ($type == 'epub') {
 		$cover = $im['data'];
 		unlink(CACHE_PATH . "tmp/$iid.tmp");
 	} else {
-		echo file_get_contents('/application/none.jpg');
+		$cover = '';
 	}
 }
-
 if (strlen($cover) < 100) {
 	$cover = file_get_contents('/application/none.jpg');
 	echo $cover;
@@ -158,9 +190,8 @@ if (strlen($cover) < 100) {
 	file_put_contents(CACHE_PATH . "covers/$iid.jpg", $cover);
 	$thm = resizeCover($cover, 300, 400);
 	imagejpeg($thm, CACHE_PATH . "covers/$iid-small.jpg", 75);
-	unset($thm);
+	$thm = null;
 }
-
 if ($small) {
 	if (file_exists(CACHE_PATH . "covers/$iid-small.jpg")) {
 		lastm(CACHE_PATH . "covers/$iid-small.jpg");
@@ -169,4 +200,3 @@ if ($small) {
 } else {
 	echo $cover;
 }
-

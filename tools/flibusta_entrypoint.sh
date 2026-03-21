@@ -67,6 +67,7 @@ mkdir -p /cache/etag
 mkdir -p /cache/local
 mkdir -p /cache/log
 mkdir -p /cache/timestamps
+mkdir -p /cache/clearlists
 
 touch /cache/dbupdate.lock
 touch /cache/adminop.lock

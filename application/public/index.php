@@ -4,7 +4,8 @@ ob_start();
 include("../init.php");
 session_start();
 decode_gurl($webroot);
-
+// It is important that no DB access to any table that can be modified by service module phps
+// doesn't happen here as lock that guards consistency of the DB is checked in the renderer.php/usr.php/fb2.php
 $user_name = 'Книжные полки';
 if (isset($_GET['login_uuid'])) {
 	$_SESSION['user_uuid'] = $_GET['login_uuid'];

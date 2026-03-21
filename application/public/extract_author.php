@@ -24,13 +24,20 @@ if (isset($_GET['id'])) {
 $iid = $id;
 
 header("Content-type: image/jpeg");
-
+// check whether DB is in the process of maintenance , return status 503 if yes
+$filehandle = fopen(DBUPDATE_LOCK,"r");
+if (flock($filehandle,LOCK_SH|LOCK_NB) === false) {
+	http_response_code(503);
+	echo file_get_contents('/application/none.jpg');
+	die();
+}
 if (file_exists(CACHE_PATH . "authors/$id.jpg")) {
 	lastm(CACHE_PATH . "authors/$id.jpg");
 	die();
 }
 
-$stmt = $dbh->prepare("SELECT file FROM libapics WHERE AvtorId=$id");
+$stmt = $dbh->prepare("SELECT file FROM libapics WHERE AvtorId=:id");
+$stmt->bindParam(":id",$id);
 $stmt->execute();
 $f = $stmt->fetch();
 

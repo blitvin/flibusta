@@ -1,4 +1,11 @@
 <?php
+
+// check whether DB is in the process of maintenance , return status 503 if yes
+$filehandle = fopen(DBUPDATE_LOCK,"r");
+if (flock($filehandle,LOCK_SH|LOCK_NB) === false) {
+	http_response_code(503);
+	die();
+}
 switch ($url->action) {
 	case 'list':
 		include('list.php');
