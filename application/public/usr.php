@@ -34,11 +34,16 @@ if ($zip->open( $zip_name)) {
 	header('Cache-Control: must-revalidate');
 	header('Pragma: public');
 
+	$dest = fopen('php://output', 'w');
 	if (isset($book->filename)) {
-		echo $zip->getFromName($book->filename);
+		$fname = $book->filename;
 	} else {
-		echo $zip->getFromName("$id." . trim($book->filetype));
+		$fname = "$id." . trim($book->filetype);
 	}
+	$src = $zip->getStream($fname);
+	stream_copy_to_stream($src, $dest);
+	fclose($src);
+	fclose($dest);
 	$zip->close();
 } else {
 	echo "NO ZIP";

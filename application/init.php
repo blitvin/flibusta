@@ -17,6 +17,13 @@ define('COUNT_BOOKS', true);
 include(ROOT_PATH . 'functions.php');
 include(ROOT_PATH . 'dbinit.php');
 include_once(ROOT_PATH . 'webroot.php');
+$strFb2size = getenv('MAX_FB2_SIZE_2_DISPLAY');
+if (is_numeric($strFb2size) && (((int)$strFb2size) > 1000000)) {
+    define('MAX_FB2_SIZE_2_DISPLAY',(int)$strFb2size);
+} else {
+    define('MAX_FB2_SIZE_2_DISPLAY', 100000000);
+}
+
 session_set_cookie_params(3600 * 24 * 31 * 12,"/");
 #session_start();
 $tz =  getenv('TZ');

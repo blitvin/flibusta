@@ -37,7 +37,14 @@ if ($zip->open($zip_name)) {
 	header('Expires: 0');
 	header('Cache-Control: must-revalidate');
 	header('Pragma: public');
-	echo $zip->getFromName("$id.fb2");
+
+	$src = $zip->getStream("$id.fb2");
+	$dest = fopen('php://output', 'w');
+
+	stream_copy_to_stream($src, $dest);
+
+	fclose($src);
+	fclose($dest);
 	$zip->close();
 } else {
 	echo "NO ZIP";

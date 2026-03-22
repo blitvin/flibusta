@@ -6,13 +6,14 @@ services:
         restart: unless-stopped
         environment:
            - TZ=${TIME_ZONE_VALUE}
-           - FLIBUSTA_WEBROOT=/mylib
+           - FLIBUSTA_WEBROOT={базовый путь к библиотеке, например если полный адрес https://myhost.org/flibusta , здесь должно быть /flibusta, если https://flibusta.myhost.org - нужно оставить пустым}
            - FLIBUSTA_DBUSER=flibusta
            - FLIBUSTA_DBNAME=flibusta
            - FLIBUSTA_DBTYPE=postgres
            - FLIBUSTA_DBHOST=postgresdb
            - FLIBUSTA_DBPASSWORD_FILE=/run/secrets/FLIBUSTA_PWD
            - POSTGRES_ADMIN_DBPASSWORD_FILE=/run/secrets/POSTGRES_ADMIN_PWD
+           - MAX_FB2_SIZE_2_DISPLAY=100000000
         networks:
            flibusta_net:
              ipv4_address: {дайте адрес в сети докера}
