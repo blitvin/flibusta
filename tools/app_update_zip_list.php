@@ -1,8 +1,8 @@
 <?php
 error_reporting(E_ALL);
-include('../dbinit.php');
+include('/application/dbinit.php');
 
-if ($handle = opendir('/application/flibusta')) {
+if ($handle = opendir('/flibusta')) {
 	$stmt = $dbh->prepare("TRUNCATE book_zip;");
 	$stmt->execute();
 
@@ -36,4 +36,5 @@ if ($handle = opendir('/application/flibusta')) {
 	$stmt->execute();
 	echo "Найдено ".$stmt->rowCount() . " книг не в файлах, они помечены как удаленные\n";
 	closedir($handle);
+	file_put_contents('/cache/timestamps/app_reindex',date('Y-m-d H:i:s'));
 }

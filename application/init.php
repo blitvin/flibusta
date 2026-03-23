@@ -1,5 +1,13 @@
 <?php
 define('ROOT_PATH', '/application/');
+define('CACHE_PATH', '/cache/');
+define('SQL_PATH', '/sql/');
+define('LIBRARY_PATH', '/flibusta/');
+define('LOCAL_LIBRARY_PATH', '/cache/local/');
+define('DBUPDATE_LOCK','/cache/dbupdate.lock');
+define('ADMINOPLOCKFILE','/cache/adminop.lock');
+define('ADMINOPSTATUSFILE','/cache/status');
+define('TIMESTAPS_PATH','/cache/timestamps/');
 define('RECORDS_PAGE', 10);
 define('BOOKS_PAGE', 10);
 define('AUTHORS_PAGE', 50);
@@ -9,9 +17,19 @@ define('COUNT_BOOKS', true);
 include(ROOT_PATH . 'functions.php');
 include(ROOT_PATH . 'dbinit.php');
 include_once(ROOT_PATH . 'webroot.php');
+$strFb2size = getenv('MAX_FB2_SIZE_2_DISPLAY');
+if (is_numeric($strFb2size) && (((int)$strFb2size) > 1000000)) {
+    define('MAX_FB2_SIZE_2_DISPLAY',(int)$strFb2size);
+} else {
+    define('MAX_FB2_SIZE_2_DISPLAY', 100000000);
+}
+
 session_set_cookie_params(3600 * 24 * 31 * 12,"/");
 #session_start();
-
+$tz =  getenv('TZ');
+if ($tz !== false){
+    date_default_timezone_set($tz);
+}
 error_reporting(E_ALL);
 
 $cdt = date('Y-m-d H:i:s');

@@ -1,11 +1,31 @@
-
-<div class='row'>
-<div class="col-sm-6">
-<div class='card'>
-<h4 class="rounded-top p-1" style="background: #d0d0d0;">Статистика</h4>
-<div class='card-body'>
 <?php
-$status_import = (trim(shell_exec('ps aux|grep app_|grep -v grep') ?? '') !== '');
+global $service_name;
+
+function get2serviceName() {
+	if (! isset($_GET['opname']))
+		return 'не орпеделена';
+	return serviceName2Label($_GET['opname']);
+}
+function serviceName2Label($opname) {
+	switch($opname) {
+		case 'empty':
+			return "Очистить кэш";
+		case 'getcovers':
+			return "Скачать обложки";
+		case 'import':
+			return  "Обновить базу";
+		case 'reindex':
+			return "Сканирование ZIP";
+		case 'download':
+			return "Скачать базу";
+		case 'getdaily':
+			return "Скачать последние обновления";
+		case 'unlockdb':
+			return "Выйти из режима техобслуживания";
+		default:
+			return htmlspecialchars($opname, ENT_QUOTES, 'UTF-8');
+	}
+}
 
 function get_ds($path){
 	$io = popen ( '/usr/bin/du -sk ' . $path, 'r' );
@@ -15,22 +35,45 @@ function get_ds($path){
 	return round($size / 1024, 1);
 }
 
-if (!$status_import) {
-	$cache_size = get_ds("/application/cache/covers") + get_ds("/application/cache/authors");
-	$books_size = round(get_ds("/application/flibusta") / 1024, 1);
+if ($service_name !== false) { 
+	// обработка нажатия на кнопку команды
+	echo "<h4 class='rounded-top p-1' style='background: #d0d0d0;'>Команда ".serviceName2Label($service_name)." начинает выполнение</h4>";
+	echo "<p>Через секунду страница начнет показ выполнения команды или, если команда быстро выполнится, вернется к дэшборду";
+}
+elseif ($command_running) {
+	// частичный output выполнения
+	echo "<h4 class='rounded-top p-1' style='background: #d0d0d0;'>Выполнение команды &quot;".get2serviceName()."&quot;</h4>";
+	$op = file_get_contents(ADMINOPSTATUSFILE);
+	echo "<div class='d-flex align-items-center m-3'>";
+	echo nl2br(htmlspecialchars($op, ENT_QUOTES, 'UTF-8'));
+	echo "<div class='spinner-border ms-auto' role='status' aria-hidden='true'></div></div>";
+}  else { 
+	// нет текущей команды
+	echo <<< __HTML
+<div class='row'>
+<div class="col-sm-6">
+<div class='card'>
+<h4 class="rounded-top p-1" style="background: #d0d0d0;">Статистика</h4>
+<div class='card-body'>
+__HTML;
+	$cache_size = get_ds(CACHE_PATH."covers") + get_ds(CACHE_PATH."authors");
+	$books_size = round(get_ds(LIBRARY_PATH) / 1024, 1);
 	$qtotal = $dbh->query("SELECT (SELECT MAX(time) FROM libbook) mmod, (SELECT COUNT(*) FROM libbook) bcnt, (SELECT COUNT(*) FROM libbook WHERE deleted='0') bdcnt");
 	$qtotal->execute();
 	$total = $qtotal->fetch();
+
+	
 	echo "<table class='table'><tbody>";
 	echo "<tr><td>Актуальность базы:</td><td>$total->mmod</td></tr>";
 	echo "<tr><td>Всего произведений:</td><td>$total->bcnt</td></tr>";
 	echo "<tr><td>Размер архива:</td><td>$books_size Gb</td></tr>";
 	echo "<tr><td>Размер кэша:</td><td>$cache_size Mb</td></tr>";
+	echo "<tr><td>Обложки скачены:</td><td>".nl2br(htmlspecialchars(file_get_contents(TIMESTAPS_PATH.'getcovers'), ENT_QUOTES, 'UTF-8'))."</td></tr>";
+	echo "<tr><td>Проверка добавлений:</td><td>".nl2br(htmlspecialchars(file_get_contents(TIMESTAPS_PATH.'update_daily'), ENT_QUOTES, 'UTF-8'))."</td></tr>";
+	echo "<tr><td>БД Флибусты скачена :</td><td>".nl2br(htmlspecialchars(file_get_contents(TIMESTAPS_PATH.'getsql'), ENT_QUOTES, 'UTF-8'))."</td></tr>";
+	echo "<tr><td>Последний скан ZIP:</td><td>".nl2br(htmlspecialchars(file_get_contents(TIMESTAPS_PATH.'app_reindex'), ENT_QUOTES, 'UTF-8'))."</td></tr>";
 	echo "</tbody></table>";
-} else {
-	echo "Идёт процесс импорта...";
-}
-?>
+	echo <<< __HTML
 </div>
 </div>
 </div>
@@ -39,52 +82,17 @@ if (!$status_import) {
 <div class='card'>
 <h4 class="rounded-top p-1" style="background: #d0d0d0;">Операции</h4>
 <div class='card-body'>
-<?php
-
-
-if (isset($_GET['empty'])) {
-	shell_exec('rm /application/cache/authors/*');
-	shell_exec('rm /application/cache/covers/*');
-	header("location:$webroot/service/");
-}
-
-if (!$status_import) {
-	if (isset($_GET['import'])) {
-		shell_exec('stdbuf -o0 /application/tools/app_import_sql.sh 2>/dev/null >/dev/null &');
-		$status_fetch = true;
-		header("location:$webroot/service/");
-	}
-	if (isset($_GET['reindex'])) {
-		shell_exec('stdbuf -o0 /application/tools/app_reindex.sh 2>/dev/null >/dev/null &');
-		$status_fetch = true;
-		header("location:$webroot/service/");
-	}
-}
-
-if ($status_import) {
-	$status = 'disabled';
-} else {
-	$status = '';
-}
-echo "<div class='d-flex justify-content-between'>";
-echo "<a class='btn btn-primary m-1 $status' href='?import=sql'>Обновить базу</a> ";
-echo "<a class='btn btn-warning m-1' href='?empty=cache'>Очистить кэш</a> ";
-echo "<a class='btn btn-warning m-1' href='?reindex'>Сканирование ZIP</a> ";
-echo "</div>";
-
-if ($status_import) {
-	$op = file_get_contents('/application/sql/status');;
-	echo "<div class='d-flex align-items-center m-3'>";
-	echo nl2br($op);
-	echo "<div class='spinner-border ms-auto' role='status' aria-hidden='true'></div></div>";
-	header("Refresh:10");
-}
-
-?>
+<table class='table'><tbody>
+<tr><td><a class='btn btn-primary m-1' href='?import=sql'>Обновить базу данных</a></td>
+<td><a class='btn btn-warning m-1' href='?empty=cache'>Очистить кэш</a></td></tr>
+<tr><td><a class='btn btn-warning m-1' href='?download=sql'>Скачать базу данных</a></td>
+<td><a class='btn btn-primary m-1' href='?reindex'>Сканирование ZIP</a></td></tr>
+<tr><td><a class ='btn btn-warning m-1' href='?getcovers'>Скачать обложки</a></td>
+<td><a class='btn  btn-warning m-1' href='?getdaily'>Скачать последние обновления</a></td></tr>
+</tbody></table>
 </div>
 </div>
 </div>
-
 </div>
 
 <div class='row'>
@@ -92,13 +100,61 @@ if ($status_import) {
 <div class='card'>
 <div class='card-body'>
 <p>
-Для выполнения обновления необходимо разместить фалы дампа Флибусты (*.sql) в каталог FlibustaSQL. Процесс занимает до 30 минут, в зависимости от быстродействия сервера (SSD значительно увеличивает скорость импорта)
-</p>
+Краткая справка по операциям
+<ul>
+<li><b>Обновить базу данных</b> заполнить таблицы БД заново из дампов, скаченных при выполнении команды "Скачать базу данных"</li>
+<li><b>Очистить кэш</b> стереть кэш авторов и облжек</li>
+<li><b>Скачать базу данных</b> Скачать текущий дамп  базы данных Флибусты</li>
+<li><b>Сканирование ZIP</b> Определить заново местоположение книг в ZIP файлаx</li>
+<li><b>Скачать обложки</b> Скачать архивы обложек с Флибусты</li>
+<li><b>Скачать последние обновления</b> Скачать последние добавленные книги с Флибусты в лркальный кэш. Чтобы новые книги стали доступны, запустите "Сканирование ZIP"</li>
+</ul>
 <p>
-Чтобы отображались фото авторов и обложек для форматов, отличных от FB2, необходимо разместить в каталоге cache файлы архивов lib.a.attached.zip и lib.b.attached.zip соответственно.
-В кэше хранятся распакованные фото авторов и обложек для FB2, а также их уменьшенные версии.</p>
-<p>Файлы архивов Флибусты (*.zip) необходимо размещать в каталоге Flibusta.Net. Обрабатываются также файлы ежедневных обновлений, но обязательно необходимо подгружать свежие SQL файлы.</p>
-<?php echo "<p>Доступен также OPDS-каталог для читалок: <a href='$webroot/opds/'>/opds/</a></p>"; ?>
-<p><b>Каталоги FlibustaSQL, cache и их подкаталоги должны иметь права на запись для контейнера. Скрипты в каталоге /application/tools/ должны иметь права на выполнение.</b></p>
-</div></div></div></div>
+Иногда проходит несколько секунд до обновления страницы после нажатия кнопки операции. Это нормально, подождите немного.
+<p>
+Синие кнопки запускают операции изменяющие базу данных. Пока они не завершатся, библиотека в состоянии техобслуживания, 
+получение новых книг, поиск и т.п. приостанавливаются. Желтые кнопки запускают операции, не влияющие на нормальную работу библиотеки.
+<p>
+
+LOG последней выполненной команды 
+__HTML;
+if (isset($_GET['opname'])){
+	echo '('.serviceName2Label($_GET['opname']).')';
+}
+echo '<p>';
+$op = file_get_contents(ADMINOPSTATUSFILE);;
+	echo "<div class='d-flex align-items-center m-3'>";
+	echo nl2br(htmlspecialchars($op, ENT_QUOTES, 'UTF-8'));
+	echo "</div></div></div></div></div>";
+}
+
+if (isset($_GET['empty'])) {
+	shell_exec('rm -f /cache/authors/*');
+	shell_exec('rm -f /cache/covers/*');
+	shell_exec('rm -f /cache/log/*');
+	file_put_contents(ADMINOPSTATUSFILE, 'Очистка cache выполнена');
+}
+
+if (isset($_GET['getcovers'])) {
+	shell_exec('stdbuf -o0 /tools/getcovers.sh  > '. ADMINOPSTATUSFILE.' &');
+	
+}
+
+
+if (isset($_GET['import'])) {
+		shell_exec('stdbuf -o0 /tools/app_import_sql.sh  > '. ADMINOPSTATUSFILE.' &');
+		
+}
+if (isset($_GET['reindex'])) {
+		shell_exec('stdbuf -o0 /tools/app_reindex.sh > '. ADMINOPSTATUSFILE.' &');		
+}
+
+if (isset($_GET['download'])) {
+		shell_exec('stdbuf -o0 /tools/getsql.sh  > '. ADMINOPSTATUSFILE.' &');
+}
+	
+if (isset($_GET['getdaily'])) {
+		shell_exec('stdbuf -o0 /tools/update_daily.sh  > '. ADMINOPSTATUSFILE.' &');
+}
+
 

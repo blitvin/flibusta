@@ -8,7 +8,10 @@ if (getenv('FLIBUSTA_DBPASSWORD_FILE')){
 }
 if (empty($dbpasswd))
 	$dbpasswd = getenv('FLIBUSTA_DBPASSWORD')?getenv('FLIBUSTA_DBPASSWORD'):'flibusta';
-
+/*
+Because of usage of trigram and other postgress specific features, it's not looks like any other db type 
+ is goign to be supported in the foreseable future
+ 
 $dbtype = getenv('FLIBUSTA_DBTYPE')?trim(strtolower(getenv('FLIBUSTA_DBTYPE'))):'postgres';
 if ($dbtype != 'postgres') { // check for valid type, currently only postgress is supported, but in the future others e.g. mysql will be added
 	error_log('unsupported db type '.$dbtype.', reverting to postgress');
@@ -19,6 +22,8 @@ $dsn = match($dbtype) {
 	// dsn for supported db types should be added here
 	default => "pgsql:host=".$dbhost.";dbname=".$dbname.";options='--client_encoding=UTF8'"
 };
+*/
+$dsn = "pgsql:host=".$dbhost.";dbname=".$dbname.";options='--client_encoding=UTF8'";
 
 try {
 	$dbh = new PDO($dsn, $dbuser, $dbpasswd);

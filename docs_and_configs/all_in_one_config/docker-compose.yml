@@ -38,8 +38,8 @@ services:
             - FLIBUSTA_DBUSER=flibusta
             - FLIBUSTA_DBNAME=flibusta
             - FLIBUSTA_DBTYPE=postgres
-            - FLIBUSTA_DBHOST=postgres
             - FLIBUSTA_DBPASSWORD_FILE=/run/secrets/FLIBUSTA_PWD
+            - MAX_FB2_SIZE_2_DISPLAY=100000000
         secrets:
             - FLIBUSTA_PWD
 

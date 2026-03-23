@@ -1,0 +1,23 @@
+#/bin/sh
+echo "Конвертация $1"
+if ! grep -q INSERT "/sql/$1"; then   
+  echo "Empty table"
+  exit 1
+fi
+
+
+
+xtable="cat /sql/$1|grep 'CREATE TABLE'|awk '{print \$3}'| sed 's/^.//;s/.$//'"
+table=$(eval "$xtable")
+
+echo $1
+echo "TRUNCATE $table;">/sql/tmp.sql
+echo $table
+echo $table >> $2
+cat /sql/$1|grep INSERT|tr -d \`|sed "s/$table/$table/g">>/sql/tmp.sql
+/tools/app_db_converter.py /sql/tmp.sql /sql/psql/$1
+rm /sql/tmp.sql
+
+echo "Импорт $1"
+$SQL_CMD -f /sql/psql/$1 >> $2
+

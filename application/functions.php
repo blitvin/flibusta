@@ -106,7 +106,7 @@ function book_small_pg($book, $webroot='',$full = false) {
 	echo "<div class='col-sm-2 col-6 mb-3'>";
 	echo "<div style='height: 100%' class='cover rounded text-center d-flex align-items-end flex-column'>";
 	echo "<a class='w-100' href='$webroot/book/view/$book->bookid'>";
-	echo "<img class='w-100 card-image rounded-top' src='$webroot/extract_cover.php?id=$book->bookid&small' />";
+	echo "<img class='w-100 card-image rounded-top' src='$webroot/extract_cover.php?sid=$book->bookid' />";
 
 	$dt =DateTime::createFromFormat('Y-m-d H:i:se', $book->time)->format('Y-m-d');
 	if (trim($book->filetype) == 'fb2') {
@@ -157,7 +157,7 @@ function book_info_pg($book, $webroot = '', $full = false) {
 	echo "<div class='card-body'>";
 	echo "<div class='row'>";
 	echo "<div class='col-sm-2'>";
-	echo "<img class='w-100 card-image rounded cover' src='$webroot/extract_cover.php?id=$book->bookid&small' />";
+	echo "<img class='w-100 card-image rounded cover' src='$webroot/extract_cover.php?sid=$book->bookid' />";
 
 	$dt =DateTime::createFromFormat('Y-m-d H:i:se', $book->time)->format('Y-m-d');
 	if (trim($book->filetype) == 'fb2') {
@@ -263,8 +263,10 @@ function book_info_pg($book, $webroot = '', $full = false) {
 	echo "</div></div>\n";
 }
 
-date_default_timezone_set('Europe/Minsk');
-date_default_timezone_set('Etc/GMT-3');
+//date_default_timezone_set('Europe/Minsk');
+//date_default_timezone_set('Etc/GMT-3');
+$mytimezone = getenv('TZ')?getenv('TZ'):'UTC';
+date_default_timezone_set($mytimezone);
 setlocale(LC_ALL, 'rus_RUS');
 
 $m_time = explode(" ",microtime());

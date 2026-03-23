@@ -24,7 +24,7 @@ $stmt->execute();
 $zip_name = $stmt->fetch()->filename;
 $zip = new ZipArchive();
 
-if ($zip->open(ROOT_PATH . "flibusta/" . $zip_name)) {
+if ($zip->open( $zip_name)) {
 	$filename = $book->author_name . " - " . $book->booktitle . " " . $id . "." . $book->filename . "." . trim($book->filetype);
 	header('Content-Description: File Transfer');
 	header('Content-Type: application/octet-stream');
@@ -34,11 +34,16 @@ if ($zip->open(ROOT_PATH . "flibusta/" . $zip_name)) {
 	header('Cache-Control: must-revalidate');
 	header('Pragma: public');
 
+	$dest = fopen('php://output', 'w');
 	if (isset($book->filename)) {
-		echo $zip->getFromName($book->filename);
+		$fname = $book->filename;
 	} else {
-		echo $zip->getFromName("$id." . trim($book->filetype));
+		$fname = "$id." . trim($book->filetype);
 	}
+	$src = $zip->getStream($fname);
+	stream_copy_to_stream($src, $dest);
+	fclose($src);
+	fclose($dest);
 	$zip->close();
 } else {
 	echo "NO ZIP";

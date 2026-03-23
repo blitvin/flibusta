@@ -24,22 +24,29 @@ if (isset($_GET['id'])) {
 $iid = $id;
 
 header("Content-type: image/jpeg");
-
-if (file_exists(ROOT_PATH . "cache/authors/$id.jpg")) {
-	lastm(ROOT_PATH . "cache/authors/$id.jpg");
+// check whether DB is in the process of maintenance , return status 503 if yes
+$filehandle = fopen(DBUPDATE_LOCK,"r");
+if (flock($filehandle,LOCK_SH|LOCK_NB) === false) {
+	http_response_code(503);
+	echo file_get_contents('/application/none.jpg');
+	die();
+}
+if (file_exists(CACHE_PATH . "authors/$id.jpg")) {
+	lastm(CACHE_PATH . "authors/$id.jpg");
 	die();
 }
 
-$stmt = $dbh->prepare("SELECT file FROM libapics WHERE AvtorId=$id");
+$stmt = $dbh->prepare("SELECT file FROM libapics WHERE AvtorId=:id");
+$stmt->bindParam(":id",$id);
 $stmt->execute();
 $f = $stmt->fetch();
 
 if (isset($f->file)) {
 	$zip = new ZipArchive(); 
-	if ($zip->open(ROOT_PATH . "cache/lib.a.attached.zip")) {
+	if ($zip->open(CACHE_PATH . "lib.a.attached.zip")) {
 		$f = $zip->getFromName($f->file);
 		if (strlen($f) > 0) {
-			file_put_contents(ROOT_PATH . "cache/authors/$id.jpg", $f);
+			file_put_contents(CACHE_PATH . "authors/$id.jpg", $f);
 			echo $f;
 			die();
 		}

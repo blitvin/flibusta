@@ -33,6 +33,19 @@ if ($user_uuid != "") {
 
 
 $content = '';
+
+// check whether File is too big to read into memory
+$stat = $zip->statName("$url->var1.fb2");
+if (!$stat) {
+	echo "<b>Не удается прочесть файл в ZIP архиве</b>";
+	return;
+}
+$filesize = $stat['size'];
+if ($filesize > MAX_FB2_SIZE_2_DISPLAY) {
+	echo "<b>Файл слишком большой для показа. Его  размер $filesize, максимальный размер файла для показа ".MAX_FB2_SIZE_2_DISPLAY."</b><br>".PHP_EOL;
+	echo "Вы можете скачать файл и читать локальную копию. Для скачивания воспользуйтесь линком fb2 под картиркой обложки";
+	die();
+}
 $data = $zip->getFromName("$url->var1.fb2");
 
 $fb2 = simplexml_load_string($data);
