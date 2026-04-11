@@ -158,16 +158,13 @@ function extractEpubCoverFromZip($zipPath, $epubName, $id) {
 	}
 }
 
-// WARNING ! For some reason when the script is called as extract_cover.php?id=..&small php crashes,
-// Not exception  - the tread itself fails. Really. Get 500 HTTP responce and nothing in logs, even no mention
-// of the call in docker log or errors log of NGinix... so use extract_cover.php?sid=... instead
 $small = isset($_GET['small']);
 
 if (isset($_GET['id'])) {
-	$id = $_GET['id'];
+	$id = intval($_GET['id']);
 } else {
 	if (isset($_GET['sid'])) {
-		$id = $_GET['sid'];
+		$id = intval($_GET['sid']);
 		$small = true;
 	}
 }

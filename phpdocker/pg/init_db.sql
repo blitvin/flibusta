@@ -1449,3 +1449,50 @@ ALTER TABLE ONLY public.seq
 -- PostgreSQL database dump complete
 --
 
+CREATE TABLE public.users (
+    id INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    username VARCHAR(50) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    is_admin BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+ALTER TABLE public.users OWNER TO flibusta;
+
+CREATE TABLE public.php_sessions (
+    id            VARCHAR(128) NOT NULL PRIMARY KEY,
+    data          BYTEA NOT NULL,       -- The serialized session data
+    user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    username VARCHAR(50),
+    ip_address INET,
+    user_agent TEXT,
+    last_accessed TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+ALTER TABLE public.php_sessions OWNER TO flibusta;
+-- Index for the garbage collector to find old sessions quickly
+CREATE INDEX idx_sessions_expiry ON public.php_sessions(last_accessed);
+
+CREATE TABLE public.login_attempts (
+    ip_address INET NOT NULL,
+    username   VARCHAR(50),
+    user_agent TEXT,
+    outcome INT NOT NULL,
+    attempt_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+ALTER TABLE public.login_attempts OWNER TO flibusta;
+CREATE INDEX idx_attempts_id ON public.login_attempts(ip_address, attempt_time);
+CREATE INDEX idx_recent_attempts ON public.login_attempts(username,attempt_time);
+
+
+CREATE TABLE public.user_tokens (
+    id SERIAL PRIMARY KEY,
+    selector CHAR(12) UNIQUE NOT NULL,
+    token_hash CHAR(64) NOT NULL,
+    user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    expires_at TIMESTAMP NOT NULL
+);
+
+ALTER TABLE public.user_tokens OWNER TO flibusta;
+
+CREATE INDEX idx_token_selector ON public.user_tokens(selector);

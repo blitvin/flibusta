@@ -13,7 +13,14 @@ VOLUME "/flibusta"
 VOLUME  "/cache"
 VOLUME  "/sql"
 
-RUN apk --no-cache add postgresql-client python3 coreutils flock tzdata
+RUN apk --no-cache add postgresql-client python3 coreutils flock tzdata brotli rsync
+
+
+COPY application/public /public_files
+
+RUN find /public_files -name "*.php" -exec sh -c '> "{}"' \;
+RUN find /public_files -type f -regex ".*\.\(js\|css\|svg\|xml\)" -exec gzip -k -9 {} + \
+    && find /public_files -type f -regex ".*\.\(js\|css\|svg\|xml\)" -exec brotli -k -Z {} +
 
 RUN chmod +x /usr/local/bin/install-php-extensions; install-php-extensions gd bz2 pdo_pgsql zip
 CMD ["/tools/flibusta_entrypoint.sh"]

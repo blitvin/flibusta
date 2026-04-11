@@ -1,5 +1,5 @@
 <?php
-include("../init.php");
+include("../webroot.php");
 echo <<< __HTML
 <OpenSearchDescription xmlns="http://a9.com/-/spec/opensearch/1.1/">
 <ShortName>Библиотека</ShortName>

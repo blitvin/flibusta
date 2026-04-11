@@ -78,6 +78,8 @@ $c3 = '';
 $c4 = '';
 $c5 = '';
 $c6 = '';
+$c7 = '';
+$s8 = '';
 
 switch ($url->mod) {
 	case '':
@@ -97,6 +99,12 @@ switch ($url->mod) {
 		break;
 	case 'service':
 		$c6 = 'active';
+		break;
+	case 'users':
+		$c7 = 'active';
+		break;
+	case 'help':
+		$s8 = 'active';
 		break;
 	default:
 		$c1 = 'active';
@@ -120,22 +128,38 @@ echo <<< __HTML
 			<li class="nav-item $c4"><a title="" class="nav-link" href="$webroot/authors/">Авторы</a></li>
 			<li class="nav-item $c3"><a title="" class="nav-link" href="$webroot/series/">Серии</a></li>
 			<li class="nav-item $c5"><a title="" class="nav-link" href="$webroot/fav/">Полка</a></li>
+			<li class="nav-item $s8"><a title="" class="nav-link" href="$webroot/help/">Справка</a></li>
+			
+__HTML;
+
+if (isset($_SESSION['is_admin']) && $_SESSION['is_admin']) {
+echo  <<< __HTML
 			<li class="nav-item $c6"><a title="" class="nav-link" href="$webroot/service/">Сервис</a></li>
+			<li class="nav-item $c7"><a title="" class="nav-link" href="$webroot/users/">Пользователи</a></li>
+__HTML;
+}
+$user_name_html = '';
+if (! empty($_SESSION['username'])) {
+    $user_name = htmlspecialchars($_SESSION['username'], ENT_QUOTES, 'UTF-8');
+    if (isset($_SESSION['is_admin']) && $_SESSION['is_admin']) {
+        $user_name_html = "<span class='btn btn-warning btn-sm me-2'>$user_name</span>";
+    } else {
+        $user_name_html = "<span class='btn btn-outline-info btn-sm me-2'>$user_name</span>";
+    }
+}
+echo <<< __HTML
 		</ul>
-
-<div class="d-flex">
-
-<a href='$webroot/favlist/' class='btn btn-outline-success' type='submit'>$user_name</a>
-__HTML
-?>
+<div class="d-flex align-items-center">
+$user_name_html
+<a class='btn btn-outline-light btn-sm' href='$webroot/login.php'>Сменить пользователя</a>
 </div>
-
 </div>
 </nav>
 </div>
 <div class="container whb">
 <br />
-<?php
+
+__HTML;
 try{
 	if (file_exists($url->module)) {
 	//	echo "<h1>$url->title</h1>";

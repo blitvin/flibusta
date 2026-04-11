@@ -52,12 +52,11 @@ if [ `$SQL_CMD -c "select 1 from pg_roles where rolname='flibusta'"  | wc -l` -e
     #restore flibusta password
     export PGPASSWORD=$FLIBUSTA_DBPASSWORD
 
-    if [ `$SQL_CMD -c "select 1 from pg_roles where rolname='flibusta'"  | wc -l` -eq 0 ]; then
+    if [ `$SQL_CMD -c "select 1 from pg_roles where rolname='$FLIBUSTA_DBUSER'"  | wc -l` -eq 0 ]; then
         echo "Can't connect to the DB after initialization attempt, exiting"
         exit 1
     fi
 fi
-
 
 mkdir -p /sql/psql
 mkdir -p /cache/authors
@@ -75,6 +74,33 @@ touch /cache/timestamps/getcovers
 touch /cache/timestamps/getsql
 touch /cache/timestamps/app_reindex
 touch /cache/timestamps/update_daily
+touch /cache/flibusta_login_attempts.log
+
+rsync -av --delete --checksum /public_files/ /public_mountpoint/
+echo Checking whether migration is required
+$SQL_CMD -f /tools/postgres_migration.sql > /cache/log/postgres_migration.log 2>&1
+echo Migration proceeded
+
+# Ensure admin user exists if env vars are set
+if [ ! -z "$FLIBUSTA_APP_ADMIN" ]; then
+    echo Admin user is set to $FLIBUSTA_APP_ADMIN, ensuring it exists
+    ADMIN_PASSWORD="$FLIBUSTA_APP_ADMIN_PASSWORD"
+    if [ ! -z "$FLIBUSTA_APP_ADMIN_PASSWORD_FILE" ] && [ -e "$FLIBUSTA_APP_ADMIN_PASSWORD_FILE" ]; then
+        ADMIN_PASSWORD=`cat "$FLIBUSTA_APP_ADMIN_PASSWORD_FILE"`
+        echo Admin password read from file $FLIBUSTA_APP_ADMIN_PASSWORD_FILE
+    fi
+    if [ ! -z "$ADMIN_PASSWORD" ]; then
+        echo "Ensuring admin user $FLIBUSTA_APP_ADMIN exists"
+        export ADMIN_PASSWORD
+        ADMIN_PASSWORD_HASH=`php -r 'echo password_hash(getenv("ADMIN_PASSWORD"), PASSWORD_DEFAULT);'`
+        unset ADMIN_PASSWORD
+        ADMIN_USER_ESCAPED=`printf '%s' "$FLIBUSTA_APP_ADMIN" | sed "s/'/''/g"`
+        ADMIN_PASSWORD_HASH_ESCAPED=`printf '%s' "$ADMIN_PASSWORD_HASH" | sed "s/'/''/g"`
+        $SQL_CMD -c "INSERT INTO users (username, password_hash, is_admin) VALUES ('$ADMIN_USER_ESCAPED', '$ADMIN_PASSWORD_HASH_ESCAPED', true) ON CONFLICT (username) DO NOTHING;"
+    fi
+fi
+
+
 
 chown -R www-data:www-data /sql/*
 chown -R www-data:www-data /cache/*

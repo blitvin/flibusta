@@ -1,5 +1,6 @@
 <?php
 global $service_name;
+global $service_csrf_token;
 
 function get2serviceName() {
 	if (! isset($_GET['opname']))
@@ -28,11 +29,21 @@ function serviceName2Label($opname) {
 }
 
 function get_ds($path){
-	$io = popen ( '/usr/bin/du -sk ' . $path, 'r' );
+	$io = popen ( '/usr/bin/du -sk ' . escapeshellarg($path), 'r' );
 	$size = fgets ( $io, 4096);
 	$size = substr ( $size, 0, strpos ( $size, "\t" ) );
 	pclose ( $io );
 	return round($size / 1024, 1);
+}
+
+function serviceActionButton($action, $label, $class, $token) {
+	$safeAction = htmlspecialchars($action, ENT_QUOTES, 'UTF-8');
+	$safeLabel = htmlspecialchars($label, ENT_QUOTES, 'UTF-8');
+	$safeToken = htmlspecialchars($token, ENT_QUOTES, 'UTF-8');
+	echo "<form method='POST' style='display:inline;'>";
+	echo "<input type='hidden' name='csrf_token' value='$safeToken'>";
+	echo "<button class='btn $class m-1' type='submit' name='$safeAction'>$safeLabel</button>";
+	echo "</form>";
 }
 
 if ($service_name !== false) { 
@@ -58,7 +69,8 @@ elseif ($command_running) {
 __HTML;
 	$cache_size = get_ds(CACHE_PATH."covers") + get_ds(CACHE_PATH."authors");
 	$books_size = round(get_ds(LIBRARY_PATH) / 1024, 1);
-	$qtotal = $dbh->query("SELECT (SELECT MAX(time) FROM libbook) mmod, (SELECT COUNT(*) FROM libbook) bcnt, (SELECT COUNT(*) FROM libbook WHERE deleted='0') bdcnt");
+	$qtotal = $dbh->query("SELECT (SELECT MAX(time) FROM libbook) mmod, 
+	(SELECT COUNT(*) FROM libbook) bcnt, (SELECT COUNT(*) FROM libbook WHERE deleted='0') bdcnt");
 	$qtotal->execute();
 	$total = $qtotal->fetch();
 
@@ -83,12 +95,21 @@ __HTML;
 <h4 class="rounded-top p-1" style="background: #d0d0d0;">Операции</h4>
 <div class='card-body'>
 <table class='table'><tbody>
-<tr><td><a class='btn btn-primary m-1' href='?import=sql'>Обновить базу данных</a></td>
-<td><a class='btn btn-warning m-1' href='?empty=cache'>Очистить кэш</a></td></tr>
-<tr><td><a class='btn btn-warning m-1' href='?download=sql'>Скачать базу данных</a></td>
-<td><a class='btn btn-primary m-1' href='?reindex'>Сканирование ZIP</a></td></tr>
-<tr><td><a class ='btn btn-warning m-1' href='?getcovers'>Скачать обложки</a></td>
-<td><a class='btn  btn-warning m-1' href='?getdaily'>Скачать последние обновления</a></td></tr>
+<tr><td>
+<?php serviceActionButton('import', 'Обновить базу данных', 'btn-primary', $service_csrf_token); ?>
+</td><td>
+<?php serviceActionButton('empty', 'Очистить кэш', 'btn-warning', $service_csrf_token); ?>
+</td></tr>
+<tr><td>
+<?php serviceActionButton('download', 'Скачать базу данных', 'btn-warning', $service_csrf_token); ?>
+</td><td>
+<?php serviceActionButton('reindex', 'Сканирование ZIP', 'btn-primary', $service_csrf_token); ?>
+</td></tr>
+<tr><td>
+<?php serviceActionButton('getcovers', 'Скачать обложки', 'btn-warning', $service_csrf_token); ?>
+</td><td>
+<?php serviceActionButton('getdaily', 'Скачать последние обновления', 'btn-warning', $service_csrf_token); ?>
+</td></tr>
 </tbody></table>
 </div>
 </div>
@@ -107,7 +128,7 @@ __HTML;
 <li><b>Скачать базу данных</b> Скачать текущий дамп  базы данных Флибусты</li>
 <li><b>Сканирование ZIP</b> Определить заново местоположение книг в ZIP файлаx</li>
 <li><b>Скачать обложки</b> Скачать архивы обложек с Флибусты</li>
-<li><b>Скачать последние обновления</b> Скачать последние добавленные книги с Флибусты в лркальный кэш. Чтобы новые книги стали доступны, запустите "Сканирование ZIP"</li>
+<li><b>Скачать последние обновления</b> Скачать последние добавленные книги с Флибусты в локальный кэш. Чтобы новые книги стали доступны, запустите "Сканирование ZIP"</li>
 </ul>
 <p>
 Иногда проходит несколько секунд до обновления страницы после нажатия кнопки операции. Это нормально, подождите немного.
@@ -128,33 +149,30 @@ $op = file_get_contents(ADMINOPSTATUSFILE);;
 	echo "</div></div></div></div></div>";
 }
 
-if (isset($_GET['empty'])) {
-	shell_exec('rm -f /cache/authors/*');
-	shell_exec('rm -f /cache/covers/*');
-	shell_exec('rm -f /cache/log/*');
-	file_put_contents(ADMINOPSTATUSFILE, 'Очистка cache выполнена');
-}
-
-if (isset($_GET['getcovers'])) {
-	shell_exec('stdbuf -o0 /tools/getcovers.sh  > '. ADMINOPSTATUSFILE.' &');
-	
-}
-
-
-if (isset($_GET['import'])) {
-		shell_exec('stdbuf -o0 /tools/app_import_sql.sh  > '. ADMINOPSTATUSFILE.' &');
-		
-}
-if (isset($_GET['reindex'])) {
-		shell_exec('stdbuf -o0 /tools/app_reindex.sh > '. ADMINOPSTATUSFILE.' &');		
-}
-
-if (isset($_GET['download'])) {
-		shell_exec('stdbuf -o0 /tools/getsql.sh  > '. ADMINOPSTATUSFILE.' &');
-}
-	
-if (isset($_GET['getdaily'])) {
-		shell_exec('stdbuf -o0 /tools/update_daily.sh  > '. ADMINOPSTATUSFILE.' &');
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $service_name !== false) {
+	switch ($service_name) {
+		case 'empty':
+			shell_exec('rm -f /cache/authors/*');
+			shell_exec('rm -f /cache/covers/*');
+			shell_exec('rm -f /cache/log/*');
+			file_put_contents(ADMINOPSTATUSFILE, 'Очистка cache выполнена');
+			break;
+		case 'getcovers':
+			shell_exec('stdbuf -o0 /tools/getcovers.sh  > '. ADMINOPSTATUSFILE.' &');
+			break;
+		case 'import':
+			shell_exec('stdbuf -o0 /tools/app_import_sql.sh  > '. ADMINOPSTATUSFILE.' &');
+			break;
+		case 'reindex':
+			shell_exec('stdbuf -o0 /tools/app_reindex.sh > '. ADMINOPSTATUSFILE.' &');
+			break;
+		case 'download':
+			shell_exec('stdbuf -o0 /tools/getsql.sh  > '. ADMINOPSTATUSFILE.' &');
+			break;
+		case 'getdaily':
+			shell_exec('stdbuf -o0 /tools/update_daily.sh  > '. ADMINOPSTATUSFILE.' &');
+			break;
+	}
 }
 
 

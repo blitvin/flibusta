@@ -1,13 +1,19 @@
+<?php
+$savePositionUrlPrefix = $webroot . '/save_position.php?' . http_build_query(array(
+	'user_uuid' => $user_uuid,
+	'bookid' => (int)$url->var1,
+)) . '&pos=';
+?>
 <script>
 var isScrolling;
+var savePositionUrlPrefix = <?php echo json_encode($savePositionUrlPrefix, JSON_UNESCAPED_SLASHES); ?>;
 
 window.addEventListener('scroll', function ( event ) {
 	window.clearTimeout( isScrolling );
 	isScrolling = setTimeout(function() {
 		console.log( this.scrollY );
 		var x = new XMLHttpRequest();
-		x.open("GET", "<?php echo "$webroot/save_position.php?user_uuid=$user_uuid&bookid=$url->var1&pos=";?>" 
-		+ (100 / document.body.scrollHeight * this.scrollY), true);
+		x.open("GET", savePositionUrlPrefix + (100 / document.body.scrollHeight * this.scrollY), true);
 		x.send(null);
 	}, 66);
 
@@ -23,9 +29,10 @@ if ($user_uuid != "") {
 	$stmt->bindParam(":id", $url->var1);
 	$stmt->execute();
 	if ($p = $stmt->fetch()) {
+		$scrollPos = (float)($p->pos ?? 0);
 		echo "<script>";
 		echo 'document.addEventListener("DOMContentLoaded", function(event) {';
-		echo "window.scrollTo(0, (document.body.scrollHeight / 100 *" . $p->pos . "));\n";
+		echo "window.scrollTo(0, (document.body.scrollHeight / 100 *" . $scrollPos . "));\n";
 		echo "});\n";
 		echo "</script>";
 	}

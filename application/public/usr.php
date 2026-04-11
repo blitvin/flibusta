@@ -19,7 +19,8 @@ $stmt->execute();
 $book = $stmt->fetch();
 
 
-$stmt = $dbh->prepare("SELECT * FROM book_zip WHERE $id BETWEEN start_id AND end_id AND usr=1");
+$stmt = $dbh->prepare("SELECT * FROM book_zip WHERE :id BETWEEN start_id AND end_id AND usr=1");
+$stmt->bindParam(":id", $id);
 $stmt->execute();
 $zip_name = $stmt->fetch()->filename;
 $zip = new ZipArchive();

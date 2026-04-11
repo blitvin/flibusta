@@ -145,8 +145,11 @@ switch ($sort_mode) {
 }
 
 if ($url->mod == 'opds') {
+	checkOPDSLogin($dbh);
 	include(ROOT_PATH . "/opds/index.php");
 } else {
+	checkLogin($dbh, isAdminPath($url),$webroot);
+	include(ROOT_PATH . 'modules/' . $url->mod . '/module.conf');
 	include(ROOT_PATH . "renderer.php");
 }
 

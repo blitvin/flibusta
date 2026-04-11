@@ -37,7 +37,10 @@ while ($b = $books->fetchObject()) {
 	echo " <title>" . htmlspecialchars($b->booktitle) . "</title>";
 
 	$as = '';
-	$authors = $dbh->query("SELECT lastname, firstname, middlename FROM libavtorname, libavtor WHERE libavtor.BookId=$b->bookid AND libavtor.AvtorId=libavtorname.AvtorId ORDER BY LastName");
+	$authors = $dbh->prepare("SELECT lastname, firstname, middlename FROM libavtorname, 
+	libavtor WHERE libavtor.BookId=:bookid AND libavtor.AvtorId=libavtorname.AvtorId ORDER BY LastName");
+	$authors->bindParam(":bookid", $b->bookid);
+	$authors->execute();
 	while ($a = $authors->fetchObject()) {
 		$as .= $a->lastname . " " . $a->firstname . " " . $a->middlename . ", ";
 	}

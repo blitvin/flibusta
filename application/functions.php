@@ -88,10 +88,18 @@ function to_pg_array($set) {
         if (is_array($t)) {
             $result[] = to_pg_array($t);
         } else {
-            $t = str_replace('"', '\\"', $t); // escape double quote
-            if (! is_numeric($t)) // quote only non-numeric values
-                $t = '"' .addslashes($t) . '"';
-            $result[] = $t;
+			if ($t === null) {
+				$result[] = 'NULL';
+				continue;
+			}
+
+			$t = (string)$t;
+			if (!is_numeric($t)) {
+				// PostgreSQL array string literal escaping: backslash and quote only.
+				$t = strtr($t, array('\\' => '\\\\', '"' => '\\"'));
+				$t = '"' . $t . '"';
+			}
+			$result[] = $t;
         }
     }
     return '{' . implode(",", $result) . '}'; // format
@@ -208,7 +216,7 @@ function book_info_pg($book, $webroot = '', $full = false) {
 		if ($a->file != '') {
 			echo "<img class='rounded-circle contact' src='$webroot/extract_author.php?id=$a->avtorid' />";	
 		}
-		echo "<a href='$webroot/author/view/$a->avtorid'>$a->lastname $a->middlename $a->firstname $a->nickname</a>";
+		echo "<a href='$webroot/author/view/$a->avtorid'>$a->lastname $a->firstname $a->middlename $a->nickname</a>";
 		echo "</div>";
 	}
 	echo "</div>";
@@ -217,7 +225,8 @@ function book_info_pg($book, $webroot = '', $full = false) {
 	echo "<div style='margin-bottom: 3px;'>";
 	$genres = $dbh->prepare("SELECT GenreId, GenreDesc FROM libgenre 
 		JOIN libgenrelist USING(GenreId)
-		WHERE BookId=$book->bookid");
+		WHERE BookId=:bookid");
+	$genres->bindParam(":bookid", $book->bookid);
 	$genres->execute();
 	while ($g = $genres->fetch()) {
 		echo "<a class='badge bg-success p-1 text-white' href='$webroot/?gid=$g->genreid'>$g->genredesc</a> ";
@@ -442,10 +451,16 @@ function decode_gurl($webroot,$mobile = false)  {
 		$path = substr($path, strlen($webroot));
   }
   list($x, $module, $action, $var1, $var2, $var3) = array_pad(explode('/', $path), 6, null);
+
+	// Normalize common front-controller paths to root route.
+	if (is_string($module) && ($module === 'index.php' || $module === 'index')) {
+		$module = '';
+	}
+
   $url = new stdClass();
 
-  $url->mod = safe_str($module);
-  $url->action = safe_str($action);
+	$url->mod = sanitize_route_token($module);
+	$url->action = sanitize_route_token($action);
   $url->var1 = intval($var1);
   $url->var2 = intval($var2);
   $url->var3 = intval($var3); 
@@ -469,11 +484,14 @@ function decode_gurl($webroot,$mobile = false)  {
     $url->mod ='primary';
   }
 
+	if (!in_array($url->mod, allowed_route_modules(), true)) {
+		$url->mod = '404';
+	}
+
   if (file_exists(ROOT_PATH . 'modules/' . $url->mod . '/module.conf')) {
     $last_modified = gmdate('D, d M Y H:i:s', filemtime(ROOT_PATH . 'modules/' . $url->mod . '/index.php')) . ' GMT';
     $url->module = ROOT_PATH . 'modules/' . $url->mod . '/index.php';
     $url->mod_path = ROOT_PATH . 'modules/' . $url->mod . '/';
-    include(ROOT_PATH . 'modules/' . $url->mod . '/module.conf');
   } else {
     $menu = false;
     include(ROOT_PATH . 'modules/404/module.conf');
@@ -495,6 +513,32 @@ function decode_gurl($webroot,$mobile = false)  {
   }
 
   return $url;
+}
+
+function sanitize_route_token($token) {
+	if (!is_string($token) || $token === '') {
+		return '';
+	}
+	$token = strtolower($token);
+	return preg_match('/^[a-z0-9_]+$/', $token) ? $token : '';
+}
+
+function allowed_route_modules() {
+	return array(
+		'primary',
+		'book',
+		'author',
+		'authors',
+		'series',
+		'genres',
+		'fav',
+		'favlist',
+		'help',
+		'opds',
+		'users',
+		'service',
+		'404',
+	);
 }
 
 function safe_str($str) {
@@ -656,4 +700,207 @@ function opds_book($b,$webroot = '') {
 	echo "\n <link href='$webroot/book/view/$b->bookid' rel='alternate' type='text/html' title='Книга на сайте' />";
 
 	echo "</entry>\n";
+}
+
+function ipInNetwork($ip, $range) {
+	if (strpos($range,'/') == false) {
+		return $ip === $range;
+	}
+
+	list($subnet, $bits) = explode('/', $range);
+	$id = ip2long($ip);
+	$subnet = ip2long($subnet);
+	$mask = -1 << (32 - $bits);
+	$subnet &= $mask;
+	return ($ip & $mask) == $subnet;
+}
+
+define('LOGIN_OK',0);
+define('LOGIN_BAD_PASSWORD',1);
+define('LOGIN_AGENT_MISMATCH',2);
+define('LOGIN_LOCKED_FAILCOUNT',3);
+define('LOGIN_IP_LOCKED',4);
+define('LOGIN_ADMIN_ACCESS_ATTEMPT',5);
+define('LOGIN_OPDS_BAD_PASSWORD',6);
+
+function record_login_attempt($pdo, $username,  $outcome) {
+	$stmt = $pdo->prepare("INSERT INTO login_attempts (ip_address, username, user_agent,outcome) values (?,?,?,?)");
+	$stmt->execute([$_SERVER['REMOTE_ADDR'],substr($_POST['username']?? 'unknown',0, 50), 
+		substr($_SERVER['HTTP_USER_AGENT'] ?? 'unavailable',0, 512), $outcome]);
+	if ($outcome > 0) {
+		file_put_contents('/cache/flibusta_login_attempts.log', '[' .date('Y-m-d H:i:s') . "]: user=$username from=".$_SERVER['REMOTE_ADDR'] . " failure code=$outcome\n", FILE_APPEND | LOCK_EX);
+		error_log("Flibusta Auth Failure: user=$username from = ".$_SERVER['REMOTE_ADDR']);
+	}
+}
+
+function checkLogin($pdo, $minAdmin = false, $webroot= '') {
+	$userIp = $_SERVER['REMOTE_ADDR'];
+	if ((TRUSTED_NET != '')  && ipInNetwork($userIp,TRUSTED_NET) && !$minAdmin)
+		return ;  // client  on trusted network, access grunted
+
+	if (isset($_SESSION['user_agent']) && $_SESSION['user_agent'] != $_SERVER['HTTP_USER_AGENT']) {
+		record_login_attempt($pdo,$_SESSION['username'] ?? 'Not known', LOGIN_AGENT_MISMATCH);
+		$_SESSION = array();
+		session_destroy();
+		http_response_code(403);
+		die("Session has been terminated for security reasons.");
+	}
+
+	if ($minAdmin && ($_SESSION['is_admin'] !== true )) {
+		record_login_attempt($pdo,$_SESSION['username'], LOGIN_ADMIN_ACCESS_ATTEMPT);
+		http_response_code(401);
+		die("Access denied.");
+	}
+	if (isset($_SESSION['user_id'])) 
+		return; // user is logged in , access grunted
+	if (checkRememberMe($pdo,$webroot)) {
+		return;
+	}
+	http_response_code(303); //redirect to login
+	header("Location: ". $webroot."/login.php");
+}
+
+function checkOPDSLogin($pdo) {
+	$userIp = $_SERVER['REMOTE_ADDR'];
+	if ((TRUSTED_NET != '')  && ipInNetwork($userIp,TRUSTED_NET))
+		return ;  // client on trusted network, access grunted
+
+	$user = $_SERVER['PHP_AUTH_USER'] ?? null;
+	$pass = $_SERVER['PHP_AUTH_PW'] ?? null;
+
+	if (empty($user) && ! empty($_SERVER['HTTP_AUTHORIZATION'])) {
+		$auth = explode(':', base64_decode(substr($_SERVER['HTTP_AUTHORIZATION'], 6)));
+		$user = $auth[0];
+		$pass = $auth[1] ?? '';
+	}
+	if ($user && $pass) {
+		$stmt = $pdo->prepare("SELECT id, password_hash FROM users where username=?");
+		$stmt->execute([$user]);
+		$userData = $stmt->fetch();
+
+		if ($userData && password_verify($pass,$userData->password_hash))
+			return;
+	}
+
+	record_login_attempt($pdo,$user, LOGIN_OPDS_BAD_PASSWORD);
+	header('WWW-Authenticate: Basic realm="My OPDS Library"');
+	header('HTTP/1.0 401 Unauthorized');
+	echo "<xml version='1.0' encoding='UTF-8' ?>
+	      <error>
+		    <message>Authenitcation required</message>
+		  </error>";
+	exit;
+}
+
+function isAdminPath($url) {
+	return ($url !== null &&  ($url->mod === 'service' || $url->mod === 'users'));
+}
+
+function login($pdo, $username, $password, $webroot,$set_remember_me) {
+
+	if (rand(0,100) < 2) {
+		cleanupUserMgmtTables($pdo);
+	}
+	$stmt = $pdo->prepare("SELECT COUNT(*) cnt FROM login_attempts WHERE username =  ? and attempt_time > NOW() - INTERVAL '15 minutes' AND outcome > 0");
+	$stmt->execute([$username]);
+	$failed_count = $stmt->fetch();
+	if ($failed_count && ($failed_count->cnt> 10)) {
+		record_login_attempt($pdo, $username, LOGIN_LOCKED_FAILCOUNT);
+		sleep(2);
+		return false;
+	}
+	$stmt = $pdo->prepare("SELECT COUNT(*) cnt FROM login_attempts WHERE ip_address = ? AND attempt_time > NOW() - INTERVAL '15 minutes' AND outcome > 0");
+	$stmt->execute([$_SERVER['REMOTE_ADDR']]);
+	$failed_count = $stmt->fetch();
+	if ($failed_count && ($failed_count->cnt > 5)) {
+		record_login_attempt($pdo, $username, LOGIN_IP_LOCKED);
+		sleep(2);
+		return false;
+	}
+
+	$stmt = $pdo->prepare("SELECT id,password_hash, is_admin from users WHERE username = ?");
+	$stmt-> execute([$username]);
+
+	$user = $stmt->fetch();
+
+	if ($user && password_verify($password, $user->password_hash)) {
+		record_login_attempt($pdo, $username, LOGIN_OK);
+		$_SESSION['user_id'] = $user->id;
+		$_SESSION['username'] = $username;
+		$_SESSION['is_admin'] = (bool) $user->is_admin;
+		$_SESSION['user_agent'] = $_SERVER['HTTP_USER_AGENT'];
+		$_SESSION['login_ip'] = $_SERVER['REMOTE_ADDR'];
+		// TODO fill in favorites
+		if ($set_remember_me) {
+			createRememberMeToken($pdo, $user->id, $webroot);
+		} else {
+			clearRememberMeToken($webroot);
+		}
+		return true;
+	}
+	record_login_attempt($pdo, $username, LOGIN_BAD_PASSWORD);
+	return false;
+}
+
+function cleanupUserMgmtTables($pdo) {
+	$pdo->query("DELETE FROM login_attempts  WHERE attempt_time < NOW() - INTERVAL '30 days'");
+	$pdo->query("DELETE FROM php_sessions WHERE last_accessed < NOW() - INTERVAL '2 days'");
+	$pdo->query("DELETE FROM user_tokens WHERE expires_at < NOW()");
+	$pdo->query("VACUUM ANALYZE login_attempts");
+	$pdo->query("VACUUM ANALYZE php_sessions");
+	$pdo->query("VACUUM ANALYZE user_tokens");
+}
+
+function createRememberMeToken($pdo, $userId, $webroot) {
+	$selector = bin2hex(random_bytes(6));
+	$validator = bin2hex(random_bytes(32));
+	$expires = date('Y-m-d H:i:s', strtotime('+30 days'));
+
+	$tokenHash = hash('sha256',$validator);
+	$stmt = $pdo->prepare("INSERT INTO user_tokens(selector, token_hash, user_id, expires_at) values(?,?,?,?)");
+	$stmt->execute([$selector, $tokenHash, $userId, $expires]);
+
+	$cookieValue = $selector.':'.$validator;
+	setcookie('flibusta_remember_me',
+				$cookieValue,
+				['expires' => time() + (86400 *30),
+				'path' => $webroot != "" ? $webroot : "/",
+                'secure' => true,
+                'httponly' => true,
+                'samesite' => 'Lax'
+				]
+	);
+}
+
+function checkRememberMe($pdo, $webroot) {
+	if (empty($_SESSION['user_id']) && ! empty($_COOKIE['flibusta_remember_me'])) {
+		$parts = explode(':', $_COOKIE['flibusta_remember_me']);
+		if (count($parts) !== 2) {
+			clearRememberMeToken($webroot);
+			return false;
+		}
+
+		list($selector, $validator) = $parts;
+
+		$stmt = $pdo->prepare("SELECT t.id, t.token_hash, t.user_id. u.username, u.is_admin FROM user_tokens t,
+	    JOIN users u ON t.user_id = u.id
+		WHERE t.selector = ? AND t.expires_at > NOW()");
+		$stmt->execute([$selector]);
+		$tokenData = $stmt->fetch();
+		if ($tokenData && hash_equals($tokenData['token_hash'], hash('sha256',$validator))) {
+			$_SESSION['user_id'] = $tokenData->user_id;
+			$_SESSION['username'] = htmlspecialchars($tokenData->username);
+			$_SESSION['is_admin'] = (bool) $tokenData->is_admin;
+			$_SESSION['user_agent'] = $_SERVER['HTTP_USER_AGENT'];
+			$pdo->prepare("DELETE FROM user_tokens WHERE id = ?")->execute([$tokenData->id]);
+			createRememberMeToken($pdo,$webroot,$tokenData->user_id);
+			return true;
+		}
+		clearRememberMeToken($webroot);
+	}
+	return false;
+}
+
+function clearRememberMeToken($webroot) {
+	setcookie('flibusta_remember_me','', time() - 7200, $webroot != "" ? $webroot : "/");
 }
