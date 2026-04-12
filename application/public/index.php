@@ -7,104 +7,63 @@ decode_gurl($webroot);
 // It is important that no DB access to any table that can be modified by service module phps
 // doesn't happen here as lock that guards consistency of the DB is checked in the renderer.php/usr.php/fb2.php
 $user_name = 'Книжные полки';
-if (isset($_GET['login_uuid'])) {
-	$_SESSION['user_uuid'] = $_GET['login_uuid'];
-}
+$current_user_id = isset($_SESSION['user_id']) ? intval($_SESSION['user_id']) : 0;
+$is_admin = !empty($_SESSION['is_admin']);
 
-if (isset($_GET['delete_uuid'])) {
-	$uu = $_GET['delete_uuid'];
-	$stmt = $dbh->prepare("DELETE FROM fav_users WHERE user_uuid=:uuid");
-	$stmt->bindParam(":uuid", $uu);
-	$stmt->execute();
-	$st = $dbh->prepare("DELETE FROM fav WHERE user_uuid=:uuid");
-	$st->bindParam(":uuid", $uu);
-	$st->execute();
-}
+// Generate CSRF token for forms
+generate_csrf_token();
 
-if (isset($_GET['new_uuid'])) {
-	$nname = trim($_GET['new_uuid']);
-	if ($nname !== '') {
-		$stmt = $dbh->prepare("INSERT INTO fav_users (user_uuid, name) VALUES (uuid_generate_v1(), :name)");
-		$stmt->bindParam(":name", $nname);
-		$stmt->execute();
-
-		$stmt = $dbh->prepare("SELECT user_uuid FROM fav_users WHERE name=:name LIMIT 1");
-		$stmt->bindParam(":name", $nname);
-		$stmt->execute();
-		$r = $stmt->fetch();
-		$user_uuid = $r->user_uuid;
-		$user_name = $nname;
-		$_SESSION['user_uuid'] = $user_uuid;
-	}
-}
-
-if (isset($_SESSION['user_uuid'])) {
-	$user_uuid = $_SESSION['user_uuid'];
-	$stmt = $dbh->prepare("SELECT * FROM fav_users WHERE user_uuid=:uuid");
-	$stmt->bindParam(":uuid", $user_uuid);
-	try {
-		$stmt->execute();
-		$user = $stmt->fetch();
-	} catch (PDOException $e) {
-		//
-	}
-	
-	if (isset($user->name)) {
-		$user_name = $user->name;
-
-		if (isset($_GET['fav_book'])) {
-			$id = intval($_GET['fav_book']);
-			$st = $dbh->prepare("INSERT INTO fav (user_uuid, bookid) VALUES(:uuid, :id) ON CONFLICT DO NOTHING");
-			$st->bindParam(":uuid", $user_uuid);
-			$st->bindParam(":id", $id);
-			$st->execute();
-		}
-		if (isset($_GET['fav_author'])) {
-			$id = intval($_GET['fav_author']);
-			$st = $dbh->prepare("INSERT INTO fav (user_uuid, avtorid) VALUES(:uuid, :id) ON CONFLICT DO NOTHING");
-			$st->bindParam(":uuid", $user_uuid);
-			$st->bindParam(":id", $id);
-			$st->execute();
-		}
-		if (isset($_GET['fav_seq'])) {
-			$id = intval($_GET['fav_seq']);
-			$st = $dbh->prepare("DELETE FROM fav WHERE user_uuid=:uuid AND seqid=:id");
-			$st->bindParam(":uuid", $user_uuid);
-			$st->bindParam(":id", $id);
-			$st->execute();
-			$st = $dbh->prepare("INSERT INTO fav (user_uuid, seqid) VALUES(:uuid, :id) ON CONFLICT DO NOTHING");
-			$st->bindParam(":uuid", $user_uuid);
-			$st->bindParam(":id", $id);
-			$st->execute();
-		}
-	
-		if (isset($_GET['unfav_book'])) {
-			$id = intval($_GET['unfav_book']);
-			$st = $dbh->prepare("DELETE FROM fav WHERE user_uuid=:uuid AND bookid=:id");
-			$st->bindParam(":uuid", $user_uuid);
-			$st->bindParam(":id", $id);
-			$st->execute();
-		}
-		if (isset($_GET['unfav_author'])) {
-			$id = intval($_GET['unfav_author']);
-			$st = $dbh->prepare("DELETE FROM fav WHERE user_uuid=:uuid AND avtorid=:id");
-			$st->bindParam(":uuid", $user_uuid);
-			$st->bindParam(":id", $id);
-			$st->execute();
-		}
-		if (isset($_GET['unfav_seq'])) {
-			$id = intval($_GET['unfav_seq']);
-			$st = $dbh->prepare("DELETE FROM fav WHERE user_uuid=:uuid AND seqid=:id");
-			$st->bindParam(":uuid", $user_uuid);
-			$st->bindParam(":id", $id);
-			$st->execute();
-		}
+// Handle POST favorite actions with CSRF validation
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $current_user_id > 0) {
+	// Validate CSRF token
+	$token = $_POST['csrf_token'] ?? '';
+	if (!validate_csrf_token($token)) {
+		// Invalid CSRF token, silently ignore
 	} else {
-		unset($_SESSION['user_uuid']);
-		$user_name = 'Книжные полки';
+		$action = $_POST['action'] ?? '';
+		$id = intval($_POST['id'] ?? 0);
+		
+		if ($action === 'fav_book' && $id > 0) {
+			$st = $dbh->prepare("INSERT INTO fav (user_id, bookid) VALUES(:uid, :id) ON CONFLICT DO NOTHING");
+			$st->bindParam(":uid", $current_user_id);
+			$st->bindParam(":id", $id);
+			$st->execute();
+		}
+		if ($action === 'unfav_book' && $id > 0) {
+			$st = $dbh->prepare("DELETE FROM fav WHERE user_id=:uid AND bookid=:id");
+			$st->bindParam(":uid", $current_user_id);
+			$st->bindParam(":id", $id);
+			$st->execute();
+		}
+		if ($action === 'fav_author' && $id > 0) {
+			$st = $dbh->prepare("INSERT INTO fav (user_id, avtorid) VALUES(:uid, :id) ON CONFLICT DO NOTHING");
+			$st->bindParam(":uid", $current_user_id);
+			$st->bindParam(":id", $id);
+			$st->execute();
+		}
+		if ($action === 'unfav_author' && $id > 0) {
+			$st = $dbh->prepare("DELETE FROM fav WHERE user_id=:uid AND avtorid=:id");
+			$st->bindParam(":uid", $current_user_id);
+			$st->bindParam(":id", $id);
+			$st->execute();
+		}
+		if ($action === 'fav_seq' && $id > 0) {
+			$st = $dbh->prepare("DELETE FROM fav WHERE user_id=:uid AND seqid=:id");
+			$st->bindParam(":uid", $current_user_id);
+			$st->bindParam(":id", $id);
+			$st->execute();
+			$st = $dbh->prepare("INSERT INTO fav (user_id, seqid) VALUES(:uid, :id) ON CONFLICT DO NOTHING");
+			$st->bindParam(":uid", $current_user_id);
+			$st->bindParam(":id", $id);
+			$st->execute();
+		}
+		if ($action === 'unfav_seq' && $id > 0) {
+			$st = $dbh->prepare("DELETE FROM fav WHERE user_id=:uid AND seqid=:id");
+			$st->bindParam(":uid", $current_user_id);
+			$st->bindParam(":id", $id);
+			$st->execute();
+		}
 	}
-} else {
-	$user_uuid = '';
 }
 
 if (isset($_GET['sort'])) {

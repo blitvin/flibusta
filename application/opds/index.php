@@ -29,7 +29,7 @@ switch ($url->action) {
 		include('fav.php');
 		break;
 	case 'favs':
-		include('favs.php');
+		include('fav.php');
 		break;
 	case 'search':
 		include('search.php');

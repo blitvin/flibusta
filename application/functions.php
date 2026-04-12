@@ -1,5 +1,27 @@
 <?php
 
+// CSRF token helpers
+function generate_csrf_token() {
+	if (!isset($_SESSION['csrf_token'])) {
+		$_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+	}
+	return $_SESSION['csrf_token'];
+}
+
+function get_csrf_token() {
+	if (!isset($_SESSION['csrf_token'])) {
+		$_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+	}
+	return $_SESSION['csrf_token'];
+}
+
+function validate_csrf_token($token) {
+	if (!isset($_SESSION['csrf_token'])) {
+		return false;
+	}
+	return hash_equals($_SESSION['csrf_token'], $token);
+}
+
 function bbc2html($content) {
   $search = array (
     '/(\[b\])(.*?)(\[\/b\])/',
@@ -107,10 +129,11 @@ function to_pg_array($set) {
 
 
 function book_small_pg($book, $webroot='',$full = false) {
-	global $dbh, $user_uuid;
+	global $dbh;
 	if (!isset($book->bookid)) {
 		return;
 	}
+	$current_user_id = isset($_SESSION['user_id']) ? intval($_SESSION['user_id']) : 0;
 	echo "<div class='col-sm-2 col-6 mb-3'>";
 	echo "<div style='height: 100%' class='cover rounded text-center d-flex align-items-end flex-column'>";
 	echo "<a class='w-100' href='$webroot/book/view/$book->bookid'>";
@@ -131,16 +154,19 @@ function book_small_pg($book, $webroot='',$full = false) {
 		$year = $dt;
 	}
 
-	$stmt = $dbh->prepare("SELECT COUNT(*) cnt FROM fav WHERE user_uuid=:uuid AND bookid=:id");
-	$stmt->bindParam(":uuid", $user_uuid);
-	$stmt->bindParam(":id", $book->bookid);
-	$stmt->execute();
-	if ($stmt->fetch()->cnt > 0) {
-		$fav = 'btn-primary';
-		$fav_url = "?unfav_book=$book->bookid";
-	} else {
-		$fav = 'btn-outline-secondary';
-		$fav_url = "?fav_book=$book->bookid";
+	$show_fav_button = false;
+	$fav = 'btn-outline-secondary';
+	$fav_action = 'fav_book';
+	if ($current_user_id > 0) {
+		$show_fav_button = true;
+		$stmt = $dbh->prepare("SELECT COUNT(*) cnt FROM fav WHERE user_id=:uid AND bookid=:id");
+		$stmt->bindParam(":uid", $current_user_id);
+		$stmt->bindParam(":id", $book->bookid);
+		$stmt->execute();
+		if ($stmt->fetch()->cnt > 0) {
+			$fav = 'btn-primary';
+			$fav_action = 'unfav_book';
+		}
 	}
 
 	echo "<div>$book->title</div></a>";
@@ -148,16 +174,25 @@ function book_small_pg($book, $webroot='',$full = false) {
 	echo "<button type='button' class='btn btn-outline-secondary btn-sm'>$year</button>";
 	echo "<a href='$fhref' title='Скачать' type='button' class='btn btn-outline-$ft btn-sm'>$book->filetype</a>";
 //	echo "<button type='button' class='btn btn-outline-secondary btn-sm'>$book->lang</button>";
-	echo "<a href='$fav_url' title='В избранное' type='button' class='btn $fav btn-sm'><i class='fas fa-heart'></i></a>";
+	if ($show_fav_button) {
+		$fav_id = $book->bookid;
+		echo "<form method='POST' action='' style='display:inline;'>
+			<input type='hidden' name='action' value='$fav_action' />
+			<input type='hidden' name='id' value='$fav_id' />
+			<input type='hidden' name='csrf_token' value='" . htmlspecialchars(get_csrf_token()) . "' />
+			<button type='submit' title='В избранное' class='btn $fav btn-sm'><i class='fas fa-heart'></i></button>
+		</form>";
+	}
 	
 	echo "</div></div></div>\n";
 }
 
 function book_info_pg($book, $webroot = '', $full = false) {
-	global $dbh, $user_uuid;
+	global $dbh;
 	if (!isset($book->bookid)) {
 		return;
 	}
+	$current_user_id = isset($_SESSION['user_id']) ? intval($_SESSION['user_id']) : 0;
 	echo "<div class='hic card mb-3' itemscope='' itemtype='http://schema.org/Book'>";
 //	echo "<div class='card-header'>";
 	echo "<h4 class='rounded-top' style='background: #d0d0d0;'><a class='book-link' href='$webroot/book/view/$book->bookid'><i class='fas'></i> $book->title</h4></a>";
@@ -187,19 +222,24 @@ function book_info_pg($book, $webroot = '', $full = false) {
 	echo "<button type='button' class='btn btn-outline-secondary btn-sm'>$year</button>";
 	echo "<a href='$fhref' title='Скачать' type='button' class='btn btn-outline-$ft btn-sm'>$book->filetype</a>";
 //	echo "<button type='button' class='btn btn-outline-secondary btn-sm'>$book->lang</button>";
-	if ($user_uuid != '') {
-		$stmt = $dbh->prepare("SELECT COUNT(*) cnt FROM fav WHERE user_uuid=:uuid AND bookid=:id");
-		$stmt->bindParam(":uuid", $user_uuid);
+	if ($current_user_id > 0) {
+		$stmt = $dbh->prepare("SELECT COUNT(*) cnt FROM fav WHERE user_id=:uid AND bookid=:id");
+		$stmt->bindParam(":uid", $current_user_id);
 		$stmt->bindParam(":id", $book->bookid);
 		$stmt->execute();
 		if ($stmt->fetch()->cnt > 0) {
 			$fav = 'btn-primary';
-			$fav_url = "?unfav_book=$book->bookid";
+			$fav_action = 'unfav_book';
 		} else {
 			$fav = 'btn-outline-secondary';
-			$fav_url = "?fav_book=$book->bookid";
+			$fav_action = 'fav_book';
 		}
-		echo "<a href='$fav_url' title='В избранное' type='button' class='btn $fav btn-sm'><i class='fas fa-heart'></i></a>";
+		echo "<form method='POST' action='' style='display:inline;'>
+			<input type='hidden' name='action' value='$fav_action' />
+			<input type='hidden' name='id' value='$book->bookid' />
+			<input type='hidden' name='csrf_token' value='" . htmlspecialchars(get_csrf_token()) . "' />
+			<button type='submit' title='В избранное' class='btn $fav btn-sm'><i class='fas fa-heart'></i></button>
+		</form>";
 	}
 	echo "</div>";
 	

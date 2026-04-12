@@ -16,15 +16,22 @@ if (isset($a->file)) {
 echo "<a class='btn btn-primary mt-2 w-100' href='$webroot/?aid=$a->avtorid'>Книги автора</a>";
 
 try {
-	$stmt = $dbh->prepare("SELECT COUNT(*) cnt FROM fav WHERE user_uuid=:uuid AND avtorid=:id");
-	$stmt->bindParam(":uuid", $user_uuid);
-	$stmt->bindParam(":id", $a->avtorid);
-	$stmt->execute();
-	$is_fav = ($stmt->fetch()->cnt > 0);
-	if (!$is_fav) {
-		echo "<a class='btn btn-secondary mt-2 w-100' href='$webroot/?fav_author=$a->avtorid'>В избранное</a>";
-	} else {
-		echo "<a class='btn btn-warning mt-2 w-100' href='$webroot/?unfav_author=$a->avtorid'>Из избранного</a>";
+	$current_user_id = isset($_SESSION['user_id']) ? intval($_SESSION['user_id']) : 0;
+	if ($current_user_id > 0) {
+		$stmt = $dbh->prepare("SELECT COUNT(*) cnt FROM fav WHERE user_id=:uid AND avtorid=:id");
+		$stmt->bindParam(":uid", $current_user_id);
+		$stmt->bindParam(":id", $a->avtorid);
+		$stmt->execute();
+		$is_fav = ($stmt->fetch()->cnt > 0);
+		$action = $is_fav ? 'unfav_author' : 'fav_author';
+		$button_text = $is_fav ? 'Из избранного' : 'В избранное';
+		$button_class = $is_fav ? 'btn-warning' : 'btn-secondary';
+		echo "<form method='POST' action='' style='display:contents;'>
+			<input type='hidden' name='action' value='$action' />
+			<input type='hidden' name='id' value='$a->avtorid' />
+			<input type='hidden' name='csrf_token' value='" . (isset($_SESSION['csrf_token']) ? htmlspecialchars($_SESSION['csrf_token']) : '') . "' />
+			<button type='submit' class='btn $button_class mt-2 w-100'>$button_text</button>
+		</form>";
 	}
 } catch (PDOException $e) {
 	//

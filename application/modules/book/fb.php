@@ -1,31 +1,27 @@
 <?php
-$savePositionUrlPrefix = $webroot . '/save_position.php?' . http_build_query(array(
-	'user_uuid' => $user_uuid,
-	'bookid' => (int)$url->var1,
-)) . '&pos=';
-?>
-<script>
-var isScrolling;
-var savePositionUrlPrefix = <?php echo json_encode($savePositionUrlPrefix, JSON_UNESCAPED_SLASHES); ?>;
+$current_user_id = isset($_SESSION['user_id']) ? intval($_SESSION['user_id']) : 0;
+if ($current_user_id > 0) {
+	$savePositionUrlPrefix = $webroot . '/save_position.php?' . http_build_query(array(
+		'bookid' => (int)$url->var1,
+	)) . '&pos=';
+	?>
+	<script>
+	var isScrolling;
+	var savePositionUrlPrefix = <?php echo json_encode($savePositionUrlPrefix, JSON_UNESCAPED_SLASHES); ?>;
 
-window.addEventListener('scroll', function ( event ) {
-	window.clearTimeout( isScrolling );
-	isScrolling = setTimeout(function() {
-		console.log( this.scrollY );
-		var x = new XMLHttpRequest();
-		x.open("GET", savePositionUrlPrefix + (100 / document.body.scrollHeight * this.scrollY), true);
-		x.send(null);
-	}, 66);
+	window.addEventListener('scroll', function (event) {
+		window.clearTimeout(isScrolling);
+		isScrolling = setTimeout(function() {
+			var x = new XMLHttpRequest();
+			x.open("GET", savePositionUrlPrefix + (100 / document.body.scrollHeight * this.scrollY), true);
+			x.send(null);
+		}, 66);
+	}, false);
+	</script>
+	<?php
 
-}, false);
-</script>
-
-
-<?php
-
-if ($user_uuid != "") {
-	$stmt = $dbh->prepare("SELECT pos FROM progress WHERE user_uuid=:uuid AND bookid=:id LIMIT 1");
-	$stmt->bindParam(":uuid", $user_uuid);
+	$stmt = $dbh->prepare("SELECT pos FROM progress WHERE user_id=:uid AND bookid=:id LIMIT 1");
+	$stmt->bindParam(":uid", $current_user_id);
 	$stmt->bindParam(":id", $url->var1);
 	$stmt->execute();
 	if ($p = $stmt->fetch()) {
