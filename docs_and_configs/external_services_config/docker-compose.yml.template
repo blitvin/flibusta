@@ -14,8 +14,9 @@ services:
            - FLIBUSTA_DBPASSWORD_FILE=/run/secrets/FLIBUSTA_PWD
            - POSTGRES_ADMIN_DBPASSWORD_FILE=/run/secrets/POSTGRES_ADMIN_PWD
            - MAX_FB2_SIZE_2_DISPLAY=100000000
-           - FLIBUSTA_APP_ADMIN=flibustaadmin
+           - FLIBUSTA_APP_ADMIN=flibustadmin
            - FLIBUSTA_APP_ADMIN_PASSWORD_FILE=/run/secrets/FLIBUSTA_APP_ADMIN_PWD
+           - FLIBUSTA_TURSTED_NET='{адрес локальной сети в которой вы разрешаете пользоваться библиотекой без пароля , например 192.168.1.0/24}'
         networks:
            flibusta_net:
              ipv4_address: {дайте адрес в сети докера}
@@ -23,7 +24,7 @@ services:
         volumes:
             - '${директория с zip файлами с книгами флибусты}:/flibusta:ro'
             - '${директория в которую сервер будет слачивать dump БД Флибусты}:/sql'
-            - '${рабочая директория для использования локальным сервером Алибусты}:/cache'
+            - '${рабочая директория для использования локальным сервером Флибусты}:/cache'
             - flibusta_public_files:/public_mountpoint
         secrets:
             - FLIBUSTA_PWD

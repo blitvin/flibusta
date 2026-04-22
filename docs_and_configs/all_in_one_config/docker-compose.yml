@@ -17,7 +17,7 @@ services:
         image: 'nginx:alpine'
         working_dir: /application
         volumes:
-            - './application:/application'
+            - flibusta_public_files:/application/public
             - './cache:/application/cache'
             - './Flibusta.Net:/application/flibusta'
             - './phpdocker/nginx/nginx.conf:/etc/nginx/conf.d/default.conf'
@@ -28,20 +28,25 @@ services:
         build: phpdocker/php-fpm
         working_dir: /application
         volumes:
-            - './application:/application'
-            - './cache:/application/cache'
-            - './Flibusta.Net:/application/flibusta'
-            - './FlibustaSQL:/application/sql'
-            - './phpdocker/php-fpm/php-ini-overrides.ini:/usr/local/etc/php/conf.d/local-custom.ini'
-            - './phpdocker/php-fpm/php-fpm.conf:/usr/local/etc/php-fpm.d/zz-php-fpm.conf'
+            - './Flibusta.Net:/flibusta:ro'
+            - './FlibustaSQL:/sql'
+            - './cache/:/cache'
+            - flibusta_public_files:/public_mountpoint
+
         environment:
             - FLIBUSTA_DBUSER=flibusta
             - FLIBUSTA_DBNAME=flibusta
             - FLIBUSTA_DBTYPE=postgres
             - FLIBUSTA_DBPASSWORD_FILE=/run/secrets/FLIBUSTA_PWD
             - MAX_FB2_SIZE_2_DISPLAY=100000000
+            - FLIBUSTA_APP_ADMIN=flibustadmin
+            - FLIBUSTA_APP_ADMIN_PASSWORD_FILE=/run/secrets/FLIBUSTA_APP_ADMIN_PWD
+            - FLIBUSTA_TURSTED_NET='192.168.1.0/24'
+            - FLIBUSTA_ALLOW_ADMIN_ACCESS_BY_HTTP='true'
         secrets:
             - FLIBUSTA_PWD
+            - FLIBUSTA_APP_ADMIN_PWD
+
 
 
 volumes:
@@ -49,3 +54,5 @@ volumes:
 secrets:
     FLIBUSTA_PWD:
         file: ./secrets/flibusta_pwd.txt
+    FLIBUSTA_APP_ADMIN_PWD:
+        file: ./secrets/flibusta_app_admin_pwd.txt

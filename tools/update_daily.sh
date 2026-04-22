@@ -3,7 +3,7 @@ URL="http://flibusta.is/daily/"
 DEST_DIR="/cache/local/"
 
 
-ADMINOPLOCKFILE=/cache/adminop.lock
+ADMINOPLOCKFILE=/cache/locks/adminop.lock
 CLEARLISTS_DIR=/cache/clearlists/
 echo "update_daily.sh : start running" >&2
 

@@ -768,7 +768,7 @@ function record_login_attempt($pdo, $username,  $outcome) {
 	$stmt->execute([$_SERVER['REMOTE_ADDR'],substr($_POST['username']?? 'unknown',0, 50), 
 		substr($_SERVER['HTTP_USER_AGENT'] ?? 'unavailable',0, 512), $outcome]);
 	if ($outcome > 0) {
-		file_put_contents('/cache/flibusta_login_attempts.log', '[' .date('Y-m-d H:i:s') . "]: user=$username from=".$_SERVER['REMOTE_ADDR'] . " failure code=$outcome\n", FILE_APPEND | LOCK_EX);
+		file_put_contents('/cache/login_attempts/flibusta_login_attempts.log', '[' .date('Y-m-d H:i:s') . "]: user=$username from=".$_SERVER['REMOTE_ADDR'] . " failure code=$outcome\n", FILE_APPEND | LOCK_EX);
 		error_log("Flibusta Auth Failure: user=$username from = ".$_SERVER['REMOTE_ADDR']);
 	}
 }

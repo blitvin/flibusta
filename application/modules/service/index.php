@@ -95,21 +95,24 @@ __HTML;
 <h4 class="rounded-top p-1" style="background: #d0d0d0;">Операции</h4>
 <div class='card-body'>
 <table class='table'><tbody>
+
 <tr><td>
-<?php serviceActionButton('import', 'Обновить базу данных', 'btn-primary', $service_csrf_token); ?>
-</td><td>
-<?php serviceActionButton('empty', 'Очистить кэш', 'btn-warning', $service_csrf_token); ?>
-</td></tr>
-<tr><td>
-<?php serviceActionButton('download', 'Скачать базу данных', 'btn-warning', $service_csrf_token); ?>
-</td><td>
-<?php serviceActionButton('reindex', 'Сканирование ZIP', 'btn-primary', $service_csrf_token); ?>
-</td></tr>
-<tr><td>
-<?php serviceActionButton('getcovers', 'Скачать обложки', 'btn-warning', $service_csrf_token); ?>
-</td><td>
-<?php serviceActionButton('getdaily', 'Скачать последние обновления', 'btn-warning', $service_csrf_token); ?>
-</td></tr>
+__HTML;
+serviceActionButton('import', 'Обновить базу данных', 'btn-primary', $service_csrf_token);
+echo '</td><td>';
+serviceActionButton('empty', 'Очистить кэш', 'btn-warning', $service_csrf_token);
+echo '</td></tr>';
+echo '<tr><td>';
+ serviceActionButton('download', 'Скачать базу данных', 'btn-warning', $service_csrf_token); 
+echo '</td><td>';
+serviceActionButton('reindex', 'Сканирование ZIP', 'btn-primary', $service_csrf_token);
+echo '</td></tr>';
+echo '<tr><td>';
+serviceActionButton('getcovers', 'Скачать обложки', 'btn-warning', $service_csrf_token); 
+echo '</td><td>';
+serviceActionButton('getdaily', 'Скачать последние обновления', 'btn-warning', $service_csrf_token);
+echo '</td></tr>';
+echo <<< __HTML
 </tbody></table>
 </div>
 </div>

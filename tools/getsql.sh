@@ -1,6 +1,6 @@
 #!/bin/sh
 
-ADMINOPLOCKFILE=/cache/adminop.lock
+ADMINOPLOCKFILE=/cache/locks/adminop.lock
 
 echo "getsql.sh : start running" >&2
 
