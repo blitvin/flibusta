@@ -65,16 +65,18 @@ mkdir -p /cache/tmp
 mkdir -p /cache/etag
 mkdir -p /cache/local
 mkdir -p /cache/log
+mkdir -p /cache/login_attempts
+mkdir -p /cache/locks
 mkdir -p /cache/timestamps
 mkdir -p /cache/clearlists
 
-touch /cache/dbupdate.lock
-touch /cache/adminop.lock
+touch /cache/locks/dbupdate.lock
+touch /cache/locks/adminop.lock
 touch /cache/timestamps/getcovers
 touch /cache/timestamps/getsql
 touch /cache/timestamps/app_reindex
 touch /cache/timestamps/update_daily
-touch /cache/flibusta_login_attempts.log
+touch /cache/login_attempts/flibusta_login_attempts.log
 
 rsync -av --delete --checksum /public_files/ /public_mountpoint/
 echo Checking whether migration is required

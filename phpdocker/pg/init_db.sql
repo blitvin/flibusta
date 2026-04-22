@@ -103,7 +103,8 @@ ALTER SEQUENCE public.book_zip_id_seq OWNED BY public.book_zip.id;
 
 CREATE TABLE public.fav (
     id integer NOT NULL,
-    user_uuid uuid,
+    user_id integer,
+    list_uuid uuid,
     bookid bigint,
     avtorid bigint,
     seqid bigint
@@ -139,16 +140,16 @@ ALTER SEQUENCE public.fav_id_seq OWNED BY public.fav.id;
 
 --
 -- TOC entry 238 (class 1259 OID 206121)
--- Name: fav_users; Type: TABLE; Schema: public; Owner: flibusta
+-- Name: fav_lists; Type: TABLE; Schema: public; Owner: flibusta
 --
 
-CREATE TABLE public.fav_users (
-    user_uuid uuid NOT NULL,
+CREATE TABLE public.fav_lists (
+    list_uuid uuid NOT NULL,
     name character varying(32) NOT NULL
 );
 
 
-ALTER TABLE public.fav_users OWNER TO flibusta;
+ALTER TABLE public.fav_lists OWNER TO flibusta;
 
 --
 -- TOC entry 204 (class 1259 OID 16530)
@@ -662,7 +663,7 @@ ALTER TABLE public.libtranslator OWNER TO flibusta;
 --
 
 CREATE TABLE public.progress (
-    user_uuid uuid NOT NULL,
+    user_id integer NOT NULL,
     bookid bigint NOT NULL,
     pos double precision
 );
@@ -795,11 +796,11 @@ ALTER TABLE ONLY public.fav
 
 --
 -- TOC entry 3137 (class 2606 OID 206125)
--- Name: fav_users fav_users_pkey; Type: CONSTRAINT; Schema: public; Owner: flibusta
+-- Name: fav_lists fav_lists_pkey; Type: CONSTRAINT; Schema: public; Owner: flibusta
 --
 
-ALTER TABLE ONLY public.fav_users
-    ADD CONSTRAINT fav_users_pkey PRIMARY KEY (user_uuid, name);
+ALTER TABLE ONLY public.fav_lists
+    ADD CONSTRAINT fav_lists_pkey PRIMARY KEY (list_uuid, name);
 
 
 --
@@ -844,7 +845,7 @@ ALTER TABLE ONLY public.libseqname_ts
 --
 
 ALTER TABLE ONLY public.progress
-    ADD CONSTRAINT progress_pkey PRIMARY KEY (user_uuid, bookid);
+    ADD CONSTRAINT progress_pkey PRIMARY KEY (user_id, bookid);
 
 
 --
@@ -887,7 +888,7 @@ CREATE INDEX i_book_vector ON public.libbook_ts USING gin (vector);
 -- Name: i_fav_uniq; Type: INDEX; Schema: public; Owner: flibusta
 --
 
-CREATE UNIQUE INDEX i_fav_uniq ON public.fav USING btree (user_uuid, bookid, avtorid, seqid);
+CREATE UNIQUE INDEX i_fav_uniq ON public.fav USING btree (list_uuid, bookid, avtorid, seqid);
 
 
 --
@@ -1496,3 +1497,9 @@ CREATE TABLE public.user_tokens (
 ALTER TABLE public.user_tokens OWNER TO flibusta;
 
 CREATE INDEX idx_token_selector ON public.user_tokens(selector);
+
+ALTER TABLE ONLY public.fav
+    ADD CONSTRAINT fav_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
+
+ALTER TABLE ONLY public.progress
+    ADD CONSTRAINT progress_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;

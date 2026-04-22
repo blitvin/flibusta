@@ -1,7 +1,7 @@
 #!/bin/sh
 
-ADMINOPLOCKFILE=/cache/adminop.lock
-DBLOCKFILE=/cache/dbupdate.lock
+ADMINOPLOCKFILE=/cache/locks/adminop.lock
+DBLOCKFILE=/cache/locks/dbupdate.lock
 
 echo "app_import_sql.sh : start running" >&2
 

@@ -10,7 +10,7 @@ echo '<div class="block rounded" style="margin-bottom:8px;"><form action="'.$web
 </div>
 
 <?php
-$stmt = $dbh->query("SELECT * FROM fav_users");
+$stmt = $dbh->query("SELECT * FROM fav_lists");
 
 echo '<div class="row">';
 while ($a = $stmt->fetch()) {
@@ -18,12 +18,12 @@ while ($a = $stmt->fetch()) {
 	echo "<div class='card mb-3'>";
 
 	echo "<div class='card-header'>";
-	echo "<a href='$webroot/fav/?login_uuid=$a->user_uuid'>$a->name</a>";
+	echo "<a href='$webroot/fav/?login_uuid=$a->list_uuid'>$a->name</a>";
 	echo "</div>";
 
 	echo "<div class='card-body'>";
-	$bs = $dbh->prepare("SELECT (SELECT COUNT(*) cnt FROM fav WHERE user_uuid=:uuid AND bookid is not null) bcnt, (SELECT COUNT(*) cnt FROM fav WHERE user_uuid=:uuid AND avtorid is not null) acnt, (SELECT COUNT(*) cnt FROM fav WHERE user_uuid=:uuid AND seqid is not null) scnt");
-	$bs->bindParam(":uuid", $a->user_uuid);
+	$bs = $dbh->prepare("SELECT (SELECT COUNT(*) cnt FROM fav WHERE list_uuid=:uuid AND bookid is not null) bcnt, (SELECT COUNT(*) cnt FROM fav WHERE list_uuid=:uuid AND avtorid is not null) acnt, (SELECT COUNT(*) cnt FROM fav WHERE list_uuid=:uuid AND seqid is not null) scnt");
+	$bs->bindParam(":uuid", $a->list_uuid);
 	$bs->execute();
 	$sta = $bs->fetch();
 	echo '<ul class="list-group list-group-horizontal">';
@@ -34,7 +34,7 @@ while ($a = $stmt->fetch()) {
 	echo "</div>";
 
 	echo "<div class='card-footer'>";
-	echo "<a class='btn btn-danger btn-sm float-end' href='$webroot/favlist/?delete_uuid=$a->user_uuid'>Удалить</a>";
+	echo "<a class='btn btn-danger btn-sm float-end' href='$webroot/favlist/?delete_uuid=$a->list_uuid'>Удалить</a>";
 	echo "</div>";
 
 	echo "</div>";

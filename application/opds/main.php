@@ -24,7 +24,7 @@ echo <<< _XML
  <id>tag:root:shelf</id>
  <title>Книжные полки</title>
  <content type="text">Избранное</content>
- <link href="$webroot/opds/favs/" type="application/atom+xml;profile=opds-catalog" />
+ <link href="$webroot/opds/fav/" type="application/atom+xml;profile=opds-catalog" />
 </entry>
 <entry> <updated>$cdt</updated>
  <id>tag:root:genre</id>

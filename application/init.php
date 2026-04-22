@@ -4,8 +4,8 @@ define('CACHE_PATH', '/cache/');
 define('SQL_PATH', '/sql/');
 define('LIBRARY_PATH', '/flibusta/');
 define('LOCAL_LIBRARY_PATH', '/cache/local/');
-define('DBUPDATE_LOCK','/cache/dbupdate.lock');
-define('ADMINOPLOCKFILE','/cache/adminop.lock');
+define('DBUPDATE_LOCK','/cache/locks/dbupdate.lock');
+define('ADMINOPLOCKFILE','/cache/locks/adminop.lock');
 define('ADMINOPSTATUSFILE','/cache/status');
 define('TIMESTAPS_PATH','/cache/timestamps/');
 define('RECORDS_PAGE', 10);
@@ -25,15 +25,19 @@ if (is_numeric($strFb2size) && (((int)$strFb2size) > 1000000)) {
 }
 
 define ('TRUSTED_NET', getenv("FLIBUSTA_TURSTED_NET")?? "");
+define ('ADMIN_ACCESS_BY_HTTPS', getenv("FLIBUSTA_ALLOW_ADMIN_ACCESS_BY_HTTP") !== 'true' ? true : false);
 
 session_set_cookie_params([ 'lifetime' => 3600 * 4 ,
                             'path' => $webroot != "" ? $webroot : "/",
                             'domain' => '',
-                            'secure' => true,
+                            'secure' => ADMIN_ACCESS_BY_HTTPS,
                             'httponly' => true,
                             'samesite' => 'Lax']);
 
 ini_set('session.serialize_handler', 'php_serialize');
+if (ADMIN_ACCESS_BY_HTTPS) {
+    ini_set('session.cookie_secure', '1');   // Only send cookie over HTTPS
+}
 ini_set('session.cookie_secure', '1');   // Only send cookie over HTTPS
 ini_set('session.cookie_httponly', '1'); // Prevent Javascript from stealing the cookie
 ini_set('session.use_only_cookies', '1');
