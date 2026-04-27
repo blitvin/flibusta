@@ -201,7 +201,7 @@ if (isset($f->file)) {
 	if ($zip->open(CACHE_PATH . "lib.b.attached.zip")) {
 		$fdata = $zip->getFromName($f->file);
 		if (strlen($fdata) > 0) {
-			file_put_contents(CACHE_PATH . "covers/$id.jpg", $f);
+			file_put_contents(CACHE_PATH . "covers/$id.jpg", $fdata);
 			$thm = resizeCover($fdata, 300, 400);
 			imagejpeg($thm, CACHE_PATH . "covers/$id-small.jpg", 75);
 			$thm = null;

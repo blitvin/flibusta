@@ -1,6 +1,6 @@
 <?php
-if (isset($_GET['id'])) {
-	$id = $_GET['id'];
+if (isset($_GET['id']) && ctype_digit($_GET['id'])) {
+	$id = (int)$_GET['id'];
 } else {
 	die();
 }
@@ -23,8 +23,8 @@ $stmt->execute();
 $book = $stmt->fetch();
 
 
-$stmt = $dbh->prepare("SELECT * FROM book_zip WHERE $id BETWEEN start_id AND end_id AND usr=0");
-$stmt->execute();
+$stmt = $dbh->prepare("SELECT * FROM book_zip WHERE ? BETWEEN start_id AND end_id AND usr=0");
+$stmt->execute([$id]);
 $zip_name = $stmt->fetch()->filename;
 $zip = new ZipArchive();
 

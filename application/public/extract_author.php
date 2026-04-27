@@ -16,8 +16,8 @@ function lastm($path) {
 	}
 }
 
-if (isset($_GET['id'])) {
-	$id = $_GET['id'];
+if (isset($_GET['id']) && ctype_digit($_GET['id'])) {
+	$id = (int)$_GET['id'];
 } else {
 	$id = 0;
 }

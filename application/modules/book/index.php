@@ -21,7 +21,8 @@ $stmt->bindParam(":id", $url->var1);
 $stmt->execute();
 
 while ($r = $stmt->fetch()) {
-	echo "<li><span class='badge bg-secondary'>$r->name</span> " . stripslashes($r->text) . "</li>";
+	echo "<li><span class='badge bg-secondary'>" . htmlspecialchars($r->name, ENT_QUOTES, 'UTF-8') . "</span> "
+   . htmlspecialchars($r->text, ENT_QUOTES, 'UTF-8') . "</li>";
 }
 
 echo "</ul></div>";

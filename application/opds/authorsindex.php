@@ -20,13 +20,16 @@ echo <<< _XML
  <link href="$webroot/opds" rel="start" type="application/atom+xml;profile=opds-catalog" />\n
 _XML;
 
-$query="
-	SELECT UPPER(SUBSTR(LastName, 1, ".($length_letters + 1).")) as alpha, COUNT(*) as cnt
+$substr_len = $length_letters + 1;
+$pattern = $letters . '[A-ZА-Я]';
+$query = "
+	SELECT UPPER(SUBSTR(LastName, 1, ?)) as alpha, COUNT(*) as cnt
 	FROM libavtorname
-	WHERE UPPER(SUBSTR(LastName, 1, ".($length_letters + 1).")) SIMILAR TO '".$letters."[A-ZА-Я]'
-	GROUP BY UPPER(SUBSTR(LastName, 1, ".($length_letters + 1)."))
+	WHERE UPPER(SUBSTR(LastName, 1, ?)) SIMILAR TO ?
+	GROUP BY UPPER(SUBSTR(LastName, 1, ?))
 	ORDER BY alpha";
-$ai = $dbh->query($query);
+$ai = $dbh->prepare($query);
+$ai->execute([$substr_len, $substr_len, $pattern, $substr_len]);
 while ($ach = $ai->fetchObject()) {
 	echo "\n<entry> <updated>$cdt</updated>";
 	echo "<id>tag:authors:$ach->alpha</id>";

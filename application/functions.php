@@ -922,8 +922,8 @@ function checkRememberMe($pdo, $webroot) {
 
 		list($selector, $validator) = $parts;
 
-		$stmt = $pdo->prepare("SELECT t.id, t.token_hash, t.user_id. u.username, u.is_admin FROM user_tokens t,
-	    JOIN users u ON t.user_id = u.id
+		$stmt = $pdo->prepare("SELECT t.id, t.token_hash, t.user_id, u.username, u.is_admin FROM user_tokens t
+		JOIN users u ON t.user_id = u.id
 		WHERE t.selector = ? AND t.expires_at > NOW()");
 		$stmt->execute([$selector]);
 		$tokenData = $stmt->fetch();
@@ -933,7 +933,7 @@ function checkRememberMe($pdo, $webroot) {
 			$_SESSION['is_admin'] = (bool) $tokenData->is_admin;
 			$_SESSION['user_agent'] = $_SERVER['HTTP_USER_AGENT'];
 			$pdo->prepare("DELETE FROM user_tokens WHERE id = ?")->execute([$tokenData->id]);
-			createRememberMeToken($pdo,$webroot,$tokenData->user_id);
+			createRememberMeToken($pdo,$tokenData->user_id,$webroot);
 			return true;
 		}
 		clearRememberMeToken($webroot);
