@@ -80,6 +80,10 @@ body {
         <div class="field">
             <label for="password">Пароль</label>
             <input id="password" type="password" name="password" required>
+            <label style="font-weight:normal; margin-top:4px;">
+                <input type="checkbox" onclick="document.getElementById('password').type = this.checked ? 'text' : 'password'">
+                Показать пароль
+            </label>
         </div>
         <div class="field">
             <label>

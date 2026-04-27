@@ -55,7 +55,7 @@ if (isset($_GET['sessions'])) {
 }
 
 if (rand(0,100) < 5) {
-		cleanupUserMgmtTables($pdo);
+		cleanupUserMgmtTables($dbh);
 }
 
 users_render_tabs($activeTab);
