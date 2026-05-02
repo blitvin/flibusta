@@ -1498,6 +1498,13 @@ ALTER TABLE public.user_tokens OWNER TO flibusta;
 
 CREATE INDEX idx_token_selector ON public.user_tokens(selector);
 
+CREATE TABLE public.user_settings (
+    user_id INT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    login_redirect VARCHAR(20) NOT NULL DEFAULT 'default'
+);
+
+ALTER TABLE public.user_settings OWNER TO flibusta;
+
 ALTER TABLE ONLY public.fav
     ADD CONSTRAINT fav_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
 

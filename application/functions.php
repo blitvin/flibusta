@@ -577,6 +577,7 @@ function allowed_route_modules() {
 		'opds',
 		'users',
 		'service',
+		'settings',
 		'404',
 	);
 }
@@ -880,6 +881,29 @@ function login($pdo, $username, $password, $webroot,$set_remember_me) {
 	}
 	record_login_attempt($pdo, $username, LOGIN_BAD_PASSWORD);
 	return false;
+}
+
+function get_login_redirect($pdo, $user_id, $webroot) {
+	$base   = $webroot ?: '/';
+	$prefix = rtrim($webroot, '/');
+	try {
+		$stmt = $pdo->prepare("SELECT login_redirect FROM user_settings WHERE user_id = ?");
+		$stmt->execute([$user_id]);
+		$pref = $stmt->fetchColumn();
+	} catch (Exception $e) {
+		return $base;
+	}
+	if ($pref === 'genres') {
+		return $prefix . '/genres/';
+	}
+	if ($pref === 'favorites') {
+		$stmt = $pdo->prepare("SELECT 1 FROM fav WHERE user_id = ? LIMIT 1");
+		$stmt->execute([$user_id]);
+		if ($stmt->fetch()) {
+			return $prefix . '/fav/';
+		}
+	}
+	return $base;
 }
 
 function cleanupUserMgmtTables($pdo) {

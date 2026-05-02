@@ -11,7 +11,7 @@ $remember = false;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (login($dbh, $_POST['username'], $_POST['password'], $webroot, !empty($_POST['rememberMe']))) {
-        $location = $webroot ?: '/';
+        $location = get_login_redirect($dbh, $_SESSION['user_id'], $webroot);
         header("Location: $location");
         http_response_code(303);
         exit;

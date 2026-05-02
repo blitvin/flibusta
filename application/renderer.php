@@ -80,6 +80,7 @@ $c5 = '';
 $c6 = '';
 $c7 = '';
 $s8 = '';
+$s9 = '';
 
 switch ($url->mod) {
 	case '':
@@ -105,6 +106,9 @@ switch ($url->mod) {
 		break;
 	case 'help':
 		$s8 = 'active';
+		break;
+	case 'settings':
+		$s9 = 'active';
 		break;
 	default:
 		$c1 = 'active';
@@ -136,6 +140,11 @@ if (isset($_SESSION['is_admin']) && $_SESSION['is_admin']) {
 echo  <<< __HTML
 			<li class="nav-item $c6"><a title="" class="nav-link" href="$webroot/service/">Сервис</a></li>
 			<li class="nav-item $c7"><a title="" class="nav-link" href="$webroot/users/">Пользователи</a></li>
+__HTML;
+}
+if (isset($_SESSION['user_id']) && $_SESSION['user_id']) {
+echo <<< __HTML
+			<li class="nav-item $s9"><a title="" class="nav-link" href="$webroot/settings/">Настройки</a></li>
 __HTML;
 }
 $user_name_html = '';

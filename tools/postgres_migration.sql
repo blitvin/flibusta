@@ -84,3 +84,9 @@ ALTER TABLE IF EXISTS public.progress
 ALTER TABLE IF EXISTS public.progress DROP CONSTRAINT IF EXISTS progress_user_id_fkey;
 ALTER TABLE IF EXISTS public.progress
     ADD CONSTRAINT progress_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
+
+-- Add user_settings table for per-user preferences
+CREATE TABLE IF NOT EXISTS user_settings (
+    user_id INT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    login_redirect VARCHAR(20) NOT NULL DEFAULT 'default'
+);
