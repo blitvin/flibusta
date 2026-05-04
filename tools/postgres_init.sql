@@ -1520,6 +1520,24 @@ CREATE TABLE public.user_settings (
 
 ALTER TABLE public.user_settings OWNER TO :FLIBUSTA_DBUSER;
 
+CREATE TABLE public.epub_progress (
+    user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    bookid BIGINT NOT NULL,
+    cfi TEXT NOT NULL,
+    PRIMARY KEY (user_id, bookid)
+);
+
+ALTER TABLE public.epub_progress OWNER TO :FLIBUSTA_DBUSER;
+
+CREATE TABLE public.djvu_progress (
+    user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    bookid BIGINT NOT NULL,
+    page INT NOT NULL DEFAULT 1,
+    PRIMARY KEY (user_id, bookid)
+);
+
+ALTER TABLE public.djvu_progress OWNER TO :FLIBUSTA_DBUSER;
+
 ALTER TABLE ONLY public.fav
     ADD CONSTRAINT fav_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
 

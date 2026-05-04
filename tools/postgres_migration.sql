@@ -90,3 +90,19 @@ CREATE TABLE IF NOT EXISTS user_settings (
     user_id INT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
     login_redirect VARCHAR(20) NOT NULL DEFAULT 'default'
 );
+
+-- Add epub_progress table for EPUB CFI-based reading position
+CREATE TABLE IF NOT EXISTS epub_progress (
+    user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    bookid BIGINT NOT NULL,
+    cfi TEXT NOT NULL,
+    PRIMARY KEY (user_id, bookid)
+);
+
+-- Add djvu_progress table for DJVU page-based reading position
+CREATE TABLE IF NOT EXISTS djvu_progress (
+    user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    bookid BIGINT NOT NULL,
+    page INT NOT NULL DEFAULT 1,
+    PRIMARY KEY (user_id, bookid)
+);

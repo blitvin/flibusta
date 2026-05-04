@@ -35,9 +35,25 @@ echo "<h6>Лицензия / License</h6>";
 echo "<p>Проект распространяется по лицензии <strong>GPL v2</strong>. Исходный код доступен на GitHub: <a href='https://github.com/blitvin/flibusta'>github.com/blitvin/flibusta</a>.</p>";
 echo "<p>The project is distributed under the <strong>GPL v2</strong> license. The source code is available at <a href='https://github.com/blitvin/flibusta'>github.com/blitvin/flibusta</a>.</p>";
 
-echo "<h6>Изображение / Background image</h6>";
+echo "<h6>Сторонние библиотеки и ресурсы / Third-party libraries and artifacts used in the project</h6>";
 echo "<p>Фоновое изображение на экране входа получено с сайта freepics.com по бесплатной лицензии. Изображение <a href='http://www.freepik.com'>Designed by macrovector / Freepik</a>.</p>";
 echo "<p>The background image on the login screen is obtained from freepics.com under a free license. The image is <a href='http://www.freepik.com'>Designed by macrovector / Freepik</a>.</p>";
+echo "<p>Проект использует следующие сторонние библиотеки:</p>";
+echo "<p>The project uses the following third-party libraries:</p>";
+echo "<div class='table-responsive'>";
+echo "<table class='table table-bordered table-sm'>";
+echo "<thead class='table-light'><tr><th>File</th><th>Library</th><th>License</th><th>Copyright</th><th>Source</th></tr></thead>";
+echo "<tbody>";
+echo "<tr><td>pdf.js, pdf.worker.js</td><td>PDF.js</td><td>Apache 2.0</td><td>Mozilla Foundation (2022)</td><td><a href='https://github.com/mozilla/pdf.js'>mozilla/pdf.js</a></td></tr>";
+echo "<tr><td>epub.min.js</td><td>epub.js</td><td>BSD 2-Clause</td><td>FuturePress</td><td><a href='https://github.com/futurepress/epub.js'>futurepress/epub.js</a></td></tr>";
+echo "<tr><td>jszip.min.js</td><td>JSZip v3.1.5</td><td>MIT / GPLv3 (dual)</td><td>Stuart Knightley (2009–2016)</td><td><a href='https://github.com/Stuk/jszip'>Stuk/jszip</a></td></tr>";
+echo "<tr><td>docx-preview.min.js</td><td>docxjs</td><td>Apache 2.0</td><td>Volodymyr Baydalka</td><td><a href='https://github.com/VolodymyrBaydalka/docxjs'>VolodymyrBaydalka/docxjs</a></td></tr>";
+echo "<tr><td>RTFJS.bundle.js, EMFJS.bundle.js, WMFJS.bundle.js</td><td>rtf.js</td><td>MIT</td><td>Thomas Bluemel (2015)</td><td><a href='https://github.com/tbluemel/rtf.js'>tbluemel/rtf.js</a></td></tr>";
+echo "<tr><td>djvu.js</td><td>DjVu.js v0.5.3 (core)</td><td>GPL v2</td><td>RussCoder</td><td><a href='https://github.com/RussCoder/djvujs'>RussCoder/djvujs</a></td></tr>";
+echo "<tr><td>djvu_viewer.js</td><td>DjVu.js (viewer)</td><td>Unlicense (public domain)</td><td>RussCoder</td><td><a href='https://github.com/RussCoder/djvujs'>RussCoder/djvujs</a></td></tr>";
+echo "<tr><td>mobi.min.js</td><td>mobi-js</td><td>MIT</td><td>Hanai</td><td><a href='https://github.com/hanai/mobi-js'>hanai/mobi-js</a></td></tr>";
+echo "</tbody></table>";
+echo "</div>";
 
 echo "<h6>Отказ от ответственности / Disclaimer</h6>";
 echo "<p>Библиотека поставляется <strong>КАК ЕСТЬ</strong>. Авторы проекта не несут ответственности за любой ущерб, потерю данных или другие последствия, вызванные некорректной работой кода.</p>";
