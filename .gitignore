@@ -1,3 +1,5 @@
 cache/*
 Flibusta.Net/*
 FlibustaSQL/*
+.vscode/*
+.claude/*
