@@ -887,12 +887,13 @@ function get_login_redirect($pdo, $user_id, $webroot) {
 	$base   = $webroot ?: '/';
 	$prefix = rtrim($webroot, '/');
 	try {
-		$stmt = $pdo->prepare("SELECT login_redirect FROM user_settings WHERE user_id = ?");
+		$stmt = $pdo->prepare("SELECT login_redirect, last_book FROM user_settings WHERE user_id = ?");
 		$stmt->execute([$user_id]);
-		$pref = $stmt->fetchColumn();
+		$row = $stmt->fetch(PDO::FETCH_OBJ);
 	} catch (Exception $e) {
 		return $base;
 	}
+	$pref = $row ? $row->login_redirect : null;
 	if ($pref === 'genres') {
 		return $prefix . '/genres/';
 	}
@@ -902,6 +903,9 @@ function get_login_redirect($pdo, $user_id, $webroot) {
 		if ($stmt->fetch()) {
 			return $prefix . '/fav/';
 		}
+	}
+	if ($pref === 'last_book' && $row && !empty($row->last_book) && intval($row->last_book) > 0) {
+		return $prefix . '/book/view/' . intval($row->last_book);
 	}
 	return $base;
 }
@@ -967,4 +971,94 @@ function checkRememberMe($pdo, $webroot) {
 
 function clearRememberMeToken($webroot) {
 	setcookie('flibusta_remember_me','', time() - 7200, $webroot != "" ? $webroot : "/");
+}
+
+function resolve_inner_zip_book(string $outerZipPath, int $bookId, string $innerZipName, string $ext): ?string {
+	$localPath = LOCAL_LIBRARY_PATH . $bookId . '.' . $ext;
+	if (file_exists($localPath)) {
+		return $localPath;
+	}
+
+	// Quick check: does the outer zip contain the inner zip entry at all?
+	$outerZip = new ZipArchive();
+	if ($outerZip->open($outerZipPath) !== true) {
+		return null;
+	}
+	if ($outerZip->locateName($innerZipName) === false) {
+		$outerZip->close();
+		return null;
+	}
+	$outerZip->close();
+
+	// Acquire per-book exclusive lock (file created on demand, no pre-creation needed)
+	$lockPath = CACHE_PATH . 'locks/book_' . $bookId . '_' . $ext . '.lock';
+	$lockFh = fopen($lockPath, 'c');
+	if ($lockFh === false) {
+		return null;
+	}
+	flock($lockFh, LOCK_EX);
+
+	try {
+		// Double-check after acquiring lock in case another request just finished
+		if (file_exists($localPath)) {
+			return $localPath;
+		}
+
+		$tmpDir = CACHE_PATH . 'tmp/book_' . $bookId . '_' . uniqid();
+		mkdir($tmpDir, 0755);
+
+		try {
+			// Extract the inner zip bytes from the outer zip into a temp file
+			$outerZip = new ZipArchive();
+			if ($outerZip->open($outerZipPath) !== true) {
+				return null;
+			}
+			$tmpInnerZip = $tmpDir . '/inner.zip';
+			$innerStream = $outerZip->getStream($innerZipName);
+			$tmpFh = fopen($tmpInnerZip, 'wb');
+			stream_copy_to_stream($innerStream, $tmpFh);
+			fclose($innerStream);
+			fclose($tmpFh);
+			$outerZip->close();
+
+			// Find the first file with the expected extension inside the inner zip
+			$innerZip = new ZipArchive();
+			if ($innerZip->open($tmpInnerZip) !== true) {
+				return null;
+			}
+			$foundName = null;
+			for ($i = 0; $i < $innerZip->numFiles; $i++) {
+				$name = $innerZip->getNameIndex($i);
+				if (strtolower(pathinfo($name, PATHINFO_EXTENSION)) === $ext) {
+					$foundName = $name;
+					break;
+				}
+			}
+			if ($foundName === null) {
+				$innerZip->close();
+				return null;
+			}
+
+			// Write book file to temp path, then atomically rename into the local cache
+			$tmpBookPath = $tmpDir . '/' . $bookId . '.' . $ext;
+			$srcStream = $innerZip->getStream($foundName);
+			$dstFh = fopen($tmpBookPath, 'wb');
+			stream_copy_to_stream($srcStream, $dstFh);
+			fclose($srcStream);
+			fclose($dstFh);
+			$innerZip->close();
+
+			rename($tmpBookPath, $localPath);
+			return $localPath;
+
+		} finally {
+			foreach (glob($tmpDir . '/*') ?: [] as $f) {
+				@unlink($f);
+			}
+			@rmdir($tmpDir);
+		}
+	} finally {
+		flock($lockFh, LOCK_UN);
+		fclose($lockFh);
+	}
 }

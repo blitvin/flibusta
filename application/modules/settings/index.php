@@ -50,7 +50,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     } elseif (isset($_POST['save_settings'])) {
         $new_redirect = $_POST['login_redirect'] ?? 'default';
-        if (!in_array($new_redirect, ['default', 'favorites', 'genres'], true)) {
+        if (!in_array($new_redirect, ['default', 'favorites', 'genres', 'last_book'], true)) {
             $new_redirect = 'default';
         }
         $stmt = $dbh->prepare("INSERT INTO user_settings (user_id, login_redirect) VALUES (?, ?)
@@ -62,9 +62,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $checked = [
-    'default'   => $login_redirect === 'default'   ? 'checked' : '',
-    'favorites' => $login_redirect === 'favorites' ? 'checked' : '',
-    'genres'    => $login_redirect === 'genres'    ? 'checked' : '',
+    'default'   => $login_redirect === 'default'    ? 'checked' : '',
+    'favorites' => $login_redirect === 'favorites'  ? 'checked' : '',
+    'genres'    => $login_redirect === 'genres'     ? 'checked' : '',
+    'last_book' => $login_redirect === 'last_book'  ? 'checked' : '',
 ];
 ?>
 
@@ -126,6 +127,11 @@ $checked = [
             <input class="form-check-input" type="radio" name="login_redirect" id="redirect_genres"
               value="genres" <?= $checked['genres'] ?>>
             <label class="form-check-label" for="redirect_genres">Жанры</label>
+          </div>
+          <div class="form-check mb-3">
+            <input class="form-check-input" type="radio" name="login_redirect" id="redirect_last_book"
+              value="last_book" <?= $checked['last_book'] ?>>
+            <label class="form-check-label" for="redirect_last_book">Последняя открытая книга</label>
           </div>
           <button type="submit" name="save_settings" class="btn btn-primary">Сохранить</button>
         </form>

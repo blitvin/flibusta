@@ -44,7 +44,7 @@ echo "<div class='table-responsive'>";
 echo "<table class='table table-bordered table-sm'>";
 echo "<thead class='table-light'><tr><th>File</th><th>Library</th><th>License</th><th>Copyright</th><th>Source</th></tr></thead>";
 echo "<tbody>";
-echo "<tr><td>pdf.js, pdf.worker.js</td><td>PDF.js</td><td>Apache 2.0</td><td>Mozilla Foundation (2022)</td><td><a href='https://github.com/mozilla/pdf.js'>mozilla/pdf.js</a></td></tr>";
+echo "<tr><td>pdf.js, pdf.worker.js</td><td>PDF.js</td><td>Apache 2.0</td><td>Mozilla Foundation</td><td><a href='https://github.com/mozilla/pdf.js'>mozilla/pdf.js</a></td></tr>";
 echo "<tr><td>epub.min.js</td><td>epub.js</td><td>BSD 2-Clause</td><td>FuturePress</td><td><a href='https://github.com/futurepress/epub.js'>futurepress/epub.js</a></td></tr>";
 echo "<tr><td>jszip.min.js</td><td>JSZip v3.1.5</td><td>MIT / GPLv3 (dual)</td><td>Stuart Knightley (2009–2016)</td><td><a href='https://github.com/Stuk/jszip'>Stuk/jszip</a></td></tr>";
 echo "<tr><td>docx-preview.min.js</td><td>docxjs</td><td>Apache 2.0</td><td>Volodymyr Baydalka</td><td><a href='https://github.com/VolodymyrBaydalka/docxjs'>VolodymyrBaydalka/docxjs</a></td></tr>";

@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -n '\\\\$book\\\\|\\\\$url->var1\\\\|decode_gurl\\\\|var1' /home/boris/flibusta/flibusta/application/public/index.php)",
+      "Bash(gh api *)"
+    ]
+  }
+}

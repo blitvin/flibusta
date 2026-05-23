@@ -1473,7 +1473,7 @@ ALTER TABLE public.users OWNER TO :FLIBUSTA_DBUSER;
 CREATE TABLE public.php_sessions (
     id            VARCHAR(128) NOT NULL PRIMARY KEY,
     data          BYTEA NOT NULL,       -- The serialized session data
-    user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    user_id INT REFERENCES users(id) ON DELETE CASCADE,
     username VARCHAR(50),
     ip_address INET,
     user_agent TEXT,

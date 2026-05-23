@@ -48,11 +48,7 @@ function lastm($path) {
  * @param int    $id         bookId. cover images are saved to /cache/covers/$id.jpg and $id-small.jpg
  * @return bool              True on success, false on failure.
  */
-function extractFb2CoverFromZip($zipPath, $fb2Name, $id) {
-    // 1. Create a stream URI for the file inside the ZIP
-    // format: zip://path/to/archive.zip#inside_file.fb2
-    $streamPath = 'zip://' . realpath($zipPath) . '#' . $fb2Name;
-
+function extractFb2CoverFromZip($streamPath, $id) {
     $reader = new XMLReader();
     if (!$reader->open($streamPath)) {
         return false;
@@ -251,7 +247,7 @@ $zip = new ZipArchive();
 
 $stmt = $dbh->prepare("SELECT filename FROM libfilename where BookId=:id");
 $stmt->bindParam(":id",$id);
-
+$stmt->execute();
 $result = $stmt->fetch();
 
 if ($result) {
@@ -265,7 +261,15 @@ if ($filename == '') {
 $stmt = null;
 
 if ($type == 'fb2') {
-	extractFb2CoverFromZip($zip_name,$filename,$id);
+	$localFb2 = LOCAL_LIBRARY_PATH . $id . '.fb2';
+	if (!file_exists($localFb2) && strtolower(pathinfo($filename, PATHINFO_EXTENSION)) === 'zip') {
+		resolve_inner_zip_book($zip_name, $id, $filename, 'fb2');
+	}
+	if (file_exists($localFb2)) {
+		extractFb2CoverFromZip($localFb2, $id);
+	} else {
+		extractFb2CoverFromZip('zip://' . realpath($zip_name) . '#' . $filename, $id);
+	}
 } elseif ($type == 'epub') {
 	extractEpubCoverFromZip($zip_name,$filename,$id);
 } else {

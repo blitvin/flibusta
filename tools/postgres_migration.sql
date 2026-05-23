@@ -8,9 +8,9 @@ CREATE TABLE IF NOT EXISTS users (
 
 
 CREATE TABLE IF NOT EXISTS php_sessions (
-    id            VARCHAR(128) NOT NULL PRIMARY KEY,                 
+    id            VARCHAR(128) NOT NULL PRIMARY KEY,
     data          BYTEA NOT NULL,
-    user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    user_id INT REFERENCES users(id) ON DELETE CASCADE,
     username VARCHAR(50),
     ip_address INET,
     user_agent TEXT,
@@ -106,3 +106,9 @@ CREATE TABLE IF NOT EXISTS djvu_progress (
     page INT NOT NULL DEFAULT 1,
     PRIMARY KEY (user_id, bookid)
 );
+
+-- Add last_book column to user_settings for "return to last opened book" redirect option
+ALTER TABLE IF EXISTS public.user_settings ADD COLUMN IF NOT EXISTS last_book INT;
+
+-- Allow anonymous (not-logged-in) sessions: user_id must be nullable
+ALTER TABLE IF EXISTS public.php_sessions ALTER COLUMN user_id DROP NOT NULL;

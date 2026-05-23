@@ -67,6 +67,7 @@ mkdir -p /cache/local
 mkdir -p /cache/log
 mkdir -p /cache/login_attempts
 mkdir -p /cache/locks
+mkdir -p /cache/processing
 mkdir -p /cache/timestamps
 mkdir -p /cache/clearlists
 

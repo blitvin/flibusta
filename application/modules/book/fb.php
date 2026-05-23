@@ -37,19 +37,32 @@ if ($current_user_id > 0) {
 
 $content = '';
 
-// check whether File is too big to read into memory
-$stat = $zip->statName("$url->var1.fb2");
-if (!$stat) {
-	echo "<b>Не удается прочесть файл в ZIP архиве</b>";
-	return;
+$localFb2 = LOCAL_LIBRARY_PATH . intval($url->var1) . '.fb2';
+if (file_exists($localFb2)) {
+	$filesize = filesize($localFb2);
+	if ($filesize > MAX_FB2_SIZE_2_DISPLAY) {
+		echo "<b>Файл слишком большой для показа. Его  размер $filesize, максимальный размер файла для показа ".MAX_FB2_SIZE_2_DISPLAY."</b><br>".PHP_EOL;
+		echo "Вы можете скачать файл и читать локальную копию. Для скачивания воспользуйтесь линком fb2 под картиркой обложки";
+		die();
+	}
+	$data = file_get_contents($localFb2);
+} else {
+	$fb2Entry = (isset($dbFilename) && $dbFilename && strtolower(pathinfo($dbFilename, PATHINFO_EXTENSION)) === 'fb2')
+		? $dbFilename
+		: $url->var1 . '.fb2';
+	$stat = $zip->statName($fb2Entry);
+	if (!$stat) {
+		echo "<b>Не удается прочесть файл в ZIP архиве</b>";
+		return;
+	}
+	$filesize = $stat['size'];
+	if ($filesize > MAX_FB2_SIZE_2_DISPLAY) {
+		echo "<b>Файл слишком большой для показа. Его  размер $filesize, максимальный размер файла для показа ".MAX_FB2_SIZE_2_DISPLAY."</b><br>".PHP_EOL;
+		echo "Вы можете скачать файл и читать локальную копию. Для скачивания воспользуйтесь линком fb2 под картиркой обложки";
+		die();
+	}
+	$data = $zip->getFromName($fb2Entry);
 }
-$filesize = $stat['size'];
-if ($filesize > MAX_FB2_SIZE_2_DISPLAY) {
-	echo "<b>Файл слишком большой для показа. Его  размер $filesize, максимальный размер файла для показа ".MAX_FB2_SIZE_2_DISPLAY."</b><br>".PHP_EOL;
-	echo "Вы можете скачать файл и читать локальную копию. Для скачивания воспользуйтесь линком fb2 под картиркой обложки";
-	die();
-}
-$data = $zip->getFromName("$url->var1.fb2");
 
 $fb2 = simplexml_load_string($data);
 echo ($fb2 ? '' : 'FB2 Parse Error'), PHP_EOL;

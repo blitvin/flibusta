@@ -44,7 +44,22 @@ if ($ext == 'fb2') {
 $stmt->execute([$url->var1]);
 if ($stmt->rowCount() >0 ){
 	$zip_name = $stmt->fetch()->filename;
-	$zip = new ZipArchive(); 
+	$zip = new ZipArchive();
+
+	// Pre-extract any inner zip so the file is ready in /cache/local/ before it is needed:
+	// - non-fb2 (pdf/epub/djvu/…): JS viewers fetch via usr.php after the page loads
+	// - fb2: fb.php reads from /cache/local/ when available (see fb.php)
+	// Determine the correct inner zip name: libfilename may store the actual name (e.g. Olga_Gromyiko_Grom.fb2.zip)
+	$fnStmt = $dbh->prepare("SELECT filename FROM libfilename WHERE BookId = ?");
+	$fnStmt->execute([$url->var1]);
+	$fnRow = $fnStmt->fetch();
+	$dbFilename = $fnRow ? $fnRow->filename : null;
+	if ($dbFilename && strtolower(pathinfo($dbFilename, PATHINFO_EXTENSION)) === 'zip') {
+		$innerZipName = $dbFilename;
+	} else {
+		$innerZipName = intval($url->var1) . '.' . $ext . '.zip';
+	}
+	resolve_inner_zip_book($zip_name, intval($url->var1), $innerZipName, $ext);
 
 	echo "<div id='reader' class='reader'>";
 	if ($zip->open($zip_name) === TRUE) {

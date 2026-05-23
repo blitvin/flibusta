@@ -9,46 +9,89 @@ include('../init.php');
 
 $stmt = $dbh->prepare("SELECT libbook.Title BookTitle, libfilename.filename, libbook.filetype,
 	CONCAT(libavtorname.LastName, ' ', libavtorname.FirstName) author_name
-		FROM libbook 
-		LEFT JOIN libavtor USING(BookId) 
-		LEFT JOIN libfilename USING(BookId) 
-		LEFT JOIN libavtorname USING(AvtorId) 
+		FROM libbook
+		LEFT JOIN libavtor USING(BookId)
+		LEFT JOIN libfilename USING(BookId)
+		LEFT JOIN libavtorname USING(AvtorId)
 		WHERE libbook.BookId=:id");
 $stmt->bindParam(":id", $id);
 $stmt->execute();
 $book = $stmt->fetch();
 
+$ext = strtolower(trim($book->filetype));
 
-$stmt = $dbh->prepare("SELECT * FROM book_zip WHERE :id BETWEEN start_id AND end_id AND usr=1");
-$stmt->bindParam(":id", $id);
-$stmt->execute();
-$zip_name = $stmt->fetch()->filename;
-$zip = new ZipArchive();
+// If libfilename says the stored file is already a zip wrapper, skip the direct lookup.
+// Otherwise use the libfilename name directly, falling back to {id}.{ext} if absent.
+if (isset($book->filename) && strtolower(pathinfo($book->filename, PATHINFO_EXTENSION)) === 'zip') {
+	$fname        = null;               // no direct entry to look for
+	$innerZipName = $book->filename;    // e.g. 709533.pdf.zip
+} elseif (isset($book->filename)) {
+	$fname        = $book->filename;
+	$innerZipName = $book->filename . '.zip';
+} else {
+	$fname        = $id . '.' . $ext;
+	$innerZipName = $id . '.' . $ext . '.zip';
+}
 
-if ($zip->open( $zip_name)) {
-	$filename = $book->author_name . " - " . $book->booktitle . " " . $id . "." . $book->filename . "." . trim($book->filetype);
+$downloadName = $book->author_name . " - " . $book->booktitle . " " . $id . "." . $book->filename . "." . trim($book->filetype);
+
+function send_book_headers(string $name): void {
 	header('Content-Description: File Transfer');
 	header('Content-Type: application/octet-stream');
-	header('Content-Disposition: attachment; filename=' . basename(rawurlencode($filename)));
+	header('Content-Disposition: attachment; filename=' . basename(rawurlencode($name)));
 	header('Content-Transfer-Encoding: binary');
 	header('Expires: 0');
 	header('Cache-Control: must-revalidate');
 	header('Pragma: public');
+}
 
+// 1. Check local cache (already extracted from a previous inner-zip request)
+$localPath = LOCAL_LIBRARY_PATH . intval($id) . '.' . $ext;
+if (file_exists($localPath)) {
+	send_book_headers($downloadName);
+	readfile($localPath);
+	exit;
+}
+
+// 2. Look up outer zip in DB
+$stmt = $dbh->prepare("SELECT * FROM book_zip WHERE :id BETWEEN start_id AND end_id AND usr=1");
+$stmt->bindParam(":id", $id);
+$stmt->execute();
+$zipRow = $stmt->fetch();
+if (!$zipRow) {
+	echo "NO ZIP";
+	exit;
+}
+$zip_name = $zipRow->filename;
+$zip = new ZipArchive();
+
+if (!$zip->open($zip_name)) {
+	echo "NO ZIP";
+	exit;
+}
+
+// 3. File directly in outer zip — serve as normal.
+// Skip if fname is null or is itself a zip (libfilename already pointed at an inner zip).
+if ($fname !== null && strtolower(pathinfo($fname, PATHINFO_EXTENSION)) !== 'zip' && $zip->locateName($fname) !== false) {
+	send_book_headers($downloadName);
 	$dest = fopen('php://output', 'w');
-	if (isset($book->filename)) {
-		$fname = $book->filename;
-	} else {
-		$fname = "$id." . trim($book->filetype);
-	}
 	$src = $zip->getStream($fname);
 	stream_copy_to_stream($src, $dest);
 	fclose($src);
 	fclose($dest);
 	$zip->close();
-} else {
-	echo "NO ZIP";
+	exit;
 }
 
+$zip->close();
 
+// 4. File missing from outer zip — try inner-zip extraction
+$localPath = resolve_inner_zip_book($zip_name, intval($id), $innerZipName, $ext);
+if ($localPath !== null) {
+	send_book_headers($downloadName);
+	readfile($localPath);
+	exit;
+}
 
+http_response_code(404);
+echo "Book file not found in archive";
