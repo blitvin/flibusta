@@ -23,13 +23,16 @@ _XML;
 $substr_len = $length_letters + 1;
 $pattern = $letters . '[A-ZА-Я]';
 $query = "
-	SELECT UPPER(SUBSTR(LastName, 1, ?)) as alpha, COUNT(*) as cnt
-	FROM libavtorname
-	WHERE UPPER(SUBSTR(LastName, 1, ?)) SIMILAR TO ?
-	GROUP BY UPPER(SUBSTR(LastName, 1, ?))
+	SELECT alpha, COUNT(*) as cnt
+	FROM (
+		SELECT UPPER(SUBSTR(LastName, 1, ?)) as alpha
+		FROM libavtorname
+	) sub
+	WHERE alpha SIMILAR TO ?
+	GROUP BY alpha
 	ORDER BY alpha";
 $ai = $dbh->prepare($query);
-$ai->execute([$substr_len, $substr_len, $pattern, $substr_len]);
+$ai->execute([$substr_len, $pattern]);
 while ($ach = $ai->fetchObject()) {
 	echo "\n<entry> <updated>$cdt</updated>";
 	echo "<id>tag:authors:$ach->alpha</id>";
