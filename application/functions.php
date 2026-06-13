@@ -743,6 +743,18 @@ function opds_book($b,$webroot = '') {
 	echo "</entry>\n";
 }
 
+function isValidIpOrSubnet(string $value): bool {
+	if ($value === '') return true;
+	if (strpos($value, '/') !== false) {
+		[$ip, $prefix] = explode('/', $value, 2);
+		return filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) !== false
+			&& ctype_digit($prefix)
+			&& (int)$prefix >= 0
+			&& (int)$prefix <= 32;
+	}
+	return filter_var($value, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) !== false;
+}
+
 function ipInNetwork($ip, $range) {
 	if (strpos($range,'/') == false) {
 		return $ip === $range;

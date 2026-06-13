@@ -2,9 +2,11 @@
 
 class PostgresSessionHandler implements SessionHandlerInterface {
     private $pdo;
+    private string $trustedNet;
 
-    public function __construct(PDO $pdo) {
+    public function __construct(PDO $pdo, string $trustedNet = '') {
         $this->pdo = $pdo;
+        $this->trustedNet = $trustedNet;
     }
 
     public function open($savePath, $sessionName): bool {
@@ -72,10 +74,18 @@ class PostgresSessionHandler implements SessionHandlerInterface {
     }
 
     public function gc($maxlifetime): int|false {
-        // Delete sessions that haven't been touched in X seconds
-        $sql = "DELETE FROM php_sessions WHERE last_accessed < NOW() - INTERVAL '1 second' * ?";
-        $stmt = $this->pdo->prepare($sql);
-        $stmt->execute([$maxlifetime]);
+        if ($this->trustedNet !== '') {
+            // Trusted-network sessions are never garbage-collected
+            $sql = "DELETE FROM php_sessions
+                    WHERE last_accessed < NOW() - INTERVAL '1 second' * ?
+                      AND (ip_address IS NULL OR NOT ip_address <<= ?::cidr)";
+            $stmt = $this->pdo->prepare($sql);
+            $stmt->execute([$maxlifetime, $this->trustedNet]);
+        } else {
+            $sql = "DELETE FROM php_sessions WHERE last_accessed < NOW() - INTERVAL '1 second' * ?";
+            $stmt = $this->pdo->prepare($sql);
+            $stmt->execute([$maxlifetime]);
+        }
         return $stmt->rowCount();
     }
 }
