@@ -31,7 +31,9 @@ if ($_trustedNet !== '' && !isValidIpOrSubnet($_trustedNet)) {
 }
 define('TRUSTED_NET', $_trustedNet);
 unset($_trustedNet);
-define ('ADMIN_ACCESS_BY_HTTPS', getenv("FLIBUSTA_ALLOW_ADMIN_ACCESS_BY_HTTP") !== 'true' ? true : false);
+define('ADMIN_ACCESS_BY_HTTPS', getenv("FLIBUSTA_ALLOW_ADMIN_ACCESS_BY_HTTP") !== 'true' ? true : false);
+define('FLIBUSTA_URL', getenv('FLIBUSTA_URL') ?: 'https://flibusta.is');
+define('FLIBUSTA_MISSING_BOOK_DOWNLOAD', getenv('FLIBUSTA_ENABLE_MISSING_BOOK_DOWNLOAD') !== 'false');
 
 $isTrustedClient = (TRUSTED_NET !== '') && ipInNetwork($_SERVER['REMOTE_ADDR'] ?? '', TRUSTED_NET);
 session_set_cookie_params([ 'lifetime' => $isTrustedClient ? 3600 * 24 * 365 : 3600 * 4,

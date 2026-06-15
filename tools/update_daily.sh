@@ -1,5 +1,5 @@
 #!/bin/sh
-URL="http://flibusta.is/daily/"
+URL="${FLIBUSTA_URL:-https://flibusta.is}/daily/"
 DEST_DIR="/cache/local/"
 
 
@@ -20,7 +20,7 @@ grep -Eo 'href="f\.(fb2|n)\.[0-9\-]+\.zip"' /cache/tmp/page.html | sed 's/href="
 
 while IFS= read -r file; do
 #    wget -c -P "$DEST_DIR" "$URL$file"
-    /tools/refresh_file.sh $file $URL $DEST_DIR
+    /tools/refresh_file.sh $file "${URL}${file}" $DEST_DIR
 done < /cache/tmp/links.txt
 
 rm /cache/tmp/page.html /cache/tmp/links.txt

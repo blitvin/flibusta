@@ -2,6 +2,7 @@
 
 ADMINOPLOCKFILE=/cache/locks/adminop.lock
 
+FLIBUSTA_URL="${FLIBUSTA_URL:-https://flibusta.is}"
 echo "getcovers.sh : start running" >&2
 
 exec 199> "$ADMINOPLOCKFILE"
@@ -14,9 +15,9 @@ fi
 
 
 echo "Обновление lib.a.attached.zip"
-/tools/refresh_file.sh lib.a.attached.zip https://flibusta.is/sql/ /cache/ 'unzip -t'
+/tools/refresh_file.sh lib.a.attached.zip "${FLIBUSTA_URL}/sql/lib.a.attached.zip" /cache/ 'unzip -t'
 echo "Обновление lib.b.attached.zip"
-/tools/refresh_file.sh lib.b.attached.zip https://flibusta.is/sql/ /cache/ 'unzip -t'
+/tools/refresh_file.sh lib.b.attached.zip "${FLIBUSTA_URL}/sql/lib.b.attached.zip" /cache/ 'unzip -t'
 echo Обновление закончено
 date > /cache/timestamps/getcovers
 echo "getcovers.sh : finished" >&2

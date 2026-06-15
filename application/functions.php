@@ -985,6 +985,88 @@ function clearRememberMeToken($webroot) {
 	setcookie('flibusta_remember_me','', time() - 7200, $webroot != "" ? $webroot : "/");
 }
 
+function fetchMissingBook(int $id, string $ext): ?string {
+	if (!FLIBUSTA_MISSING_BOOK_DOWNLOAD || FLIBUSTA_URL === '') {
+		return null;
+	}
+	$localPath = LOCAL_LIBRARY_PATH . $id . '.' . $ext;
+	if (file_exists($localPath)) {
+		return $localPath;
+	}
+
+	$lockPath = CACHE_PATH . 'locks/book_' . $id . '_' . $ext . '.lock';
+	$lockFh = fopen($lockPath, 'c');
+	if ($lockFh === false) {
+		return null;
+	}
+	flock($lockFh, LOCK_EX);
+
+	try {
+		if (file_exists($localPath)) {
+			return $localPath;
+		}
+
+		$url = FLIBUSTA_URL . '/b/' . $id . '/' . $ext;
+		$tmpPath = CACHE_PATH . 'tmp/book_' . $id . '_' . uniqid();
+
+		$ch = curl_init($url);
+		$fh = fopen($tmpPath, 'wb');
+		curl_setopt_array($ch, [
+			CURLOPT_FILE           => $fh,
+			CURLOPT_FOLLOWLOCATION => true,
+			CURLOPT_TIMEOUT        => 60,
+			CURLOPT_FAILONERROR    => true,
+		]);
+		$ok       = curl_exec($ch);
+		$httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+		$finalUrl = curl_getinfo($ch, CURLINFO_EFFECTIVE_URL);
+		fclose($fh);
+		if (!$ok || $httpCode !== 200 || !file_exists($tmpPath) || filesize($tmpPath) < 100) {
+			@unlink($tmpPath);
+			error_log("fetchMissingBook: failed to download book $id.$ext from $url (HTTP $httpCode)");
+			return null;
+		}
+
+		// For fb2: the server may redirect to a .fb2.zip — extract the fb2 entry directly.
+		if ($ext === 'fb2' && str_ends_with(strtolower(parse_url($finalUrl, PHP_URL_PATH) ?? ''), '.zip')) {
+			$zip = new ZipArchive();
+			if ($zip->open($tmpPath) !== true) {
+				@unlink($tmpPath);
+				error_log("fetchMissingBook: downloaded file for book $id is not a valid zip");
+				return null;
+			}
+			$foundName = null;
+			for ($i = 0; $i < $zip->numFiles; $i++) {
+				$name = $zip->getNameIndex($i);
+				if (strtolower(pathinfo($name, PATHINFO_EXTENSION)) === 'fb2') {
+					$foundName = $name;
+					break;
+				}
+			}
+			if ($foundName === null) {
+				$zip->close();
+				@unlink($tmpPath);
+				error_log("fetchMissingBook: no fb2 entry found in downloaded zip for book $id");
+				return null;
+			}
+			$srcStream = $zip->getStream($foundName);
+			$dstFh = fopen($localPath, 'wb');
+			stream_copy_to_stream($srcStream, $dstFh);
+			fclose($srcStream);
+			fclose($dstFh);
+			$zip->close();
+			@unlink($tmpPath);
+			return $localPath;
+		}
+
+		rename($tmpPath, $localPath);
+		return $localPath;
+	} finally {
+		flock($lockFh, LOCK_UN);
+		fclose($lockFh);
+	}
+}
+
 function resolve_inner_zip_book(string $outerZipPath, int $bookId, string $innerZipName, string $ext): ?string {
 	$localPath = LOCAL_LIBRARY_PATH . $bookId . '.' . $ext;
 	if (file_exists($localPath)) {

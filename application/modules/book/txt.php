@@ -34,7 +34,12 @@ document.addEventListener("DOMContentLoaded", function() {
 </script>
 <?php endif; ?>
 <?php
-$content = $zip->getFromName("$url->var1.txt");
+$localTxt = LOCAL_LIBRARY_PATH . intval($url->var1) . '.txt';
+if (file_exists($localTxt)) {
+	$content = file_get_contents($localTxt);
+} else {
+	$content = $zip->getFromName("$url->var1.txt");
+}
 if (!mb_detect_encoding($content, 'UTF-8', true)) {
 	$content = iconv('windows-1251//IGNORE', 'UTF-8//IGNORE', $content);
 }

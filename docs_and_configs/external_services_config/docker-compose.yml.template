@@ -17,6 +17,8 @@ services:
            - FLIBUSTA_APP_ADMIN=flibustadmin
            - FLIBUSTA_APP_ADMIN_PASSWORD_FILE=/run/secrets/FLIBUSTA_APP_ADMIN_PWD
            - FLIBUSTA_TURSTED_NET='{адрес локальной сети в которой вы разрешаете пользоваться библиотекой без пароля , например 192.168.1.0/24}'
+           - FLIBUSTA_URL=https://flibusta.is
+           - FLIBUSTA_ENABLE_MISSING_BOOK_DOWNLOAD=true
         networks:
            flibusta_net:
              ipv4_address: {дайте адрес в сети докера}

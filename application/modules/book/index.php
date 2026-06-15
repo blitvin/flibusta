@@ -104,7 +104,41 @@ if ($stmt->rowCount() >0 ){
 		echo "<p><b><center> Не удалось открыть архив $zip_name ,Ошибка ".$zip->getStatusString()."</center></b></p>\n";
 	}
 } else {
-	echo "<p><b><center>Не удалось открыть книгу № ". $url->var1 . " , вероятно zip файл с книгой отсутсвует</center></b></p>\n";
+	$localPath = fetchMissingBook(intval($url->var1), $ext);
+	if ($localPath !== null) {
+		$zip = new ZipArchive();
+		echo "<div id='reader' class='reader'>";
+		if ($ext == 'fb2') {
+			include('fb.php');
+		}
+		if ($ext == 'txt') {
+			include('txt.php');
+		}
+		if ($ext == 'epub') {
+			include('epub.php');
+		}
+		if ($ext == 'pdf') {
+			include('pdf.php');
+		}
+		if ($ext == 'mobi') {
+			include('mobi.php');
+		}
+		if (($ext == 'djvu') || ($ext == 'djv')) {
+			include('djvu.php');
+		}
+		if ($ext == 'rtf') {
+			include('rtf.php');
+		}
+		if ($ext == 'docx') {
+			include('docx.php');
+		}
+		if (($ext == 'html') || ($ext == 'htm')) {
+			include('html.php');
+		}
+		echo "</div>";
+	} else {
+		echo "<p><b><center>Не удалось открыть книгу № ". $url->var1 . " , вероятно zip файл с книгой отсутсвует</center></b></p>\n";
+	}
 }
 
 

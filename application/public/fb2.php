@@ -62,6 +62,12 @@ $stmt = $dbh->prepare("SELECT * FROM book_zip WHERE ? BETWEEN start_id AND end_i
 $stmt->execute([$id]);
 $zipRow = $stmt->fetch();
 if (!$zipRow) {
+	$localPath = fetchMissingBook($id, 'fb2');
+	if ($localPath !== null) {
+		send_fb2_headers($downloadName);
+		readfile($localPath);
+		exit;
+	}
 	echo "NO ZIP";
 	exit;
 }
@@ -90,6 +96,14 @@ $zip->close();
 
 // 4. File missing from outer zip — try inner-zip extraction
 $localPath = resolve_inner_zip_book($zip_name, $id, $innerZipName, 'fb2');
+if ($localPath !== null) {
+	send_fb2_headers($downloadName);
+	readfile($localPath);
+	exit;
+}
+
+// 5. Not in local zips — try downloading from Flibusta
+$localPath = fetchMissingBook($id, 'fb2');
 if ($localPath !== null) {
 	send_fb2_headers($downloadName);
 	readfile($localPath);

@@ -59,6 +59,12 @@ $stmt->bindParam(":id", $id);
 $stmt->execute();
 $zipRow = $stmt->fetch();
 if (!$zipRow) {
+	$localPath = fetchMissingBook(intval($id), $ext);
+	if ($localPath !== null) {
+		send_book_headers($downloadName);
+		readfile($localPath);
+		exit;
+	}
 	echo "NO ZIP";
 	exit;
 }
@@ -87,6 +93,14 @@ $zip->close();
 
 // 4. File missing from outer zip — try inner-zip extraction
 $localPath = resolve_inner_zip_book($zip_name, intval($id), $innerZipName, $ext);
+if ($localPath !== null) {
+	send_book_headers($downloadName);
+	readfile($localPath);
+	exit;
+}
+
+// 5. Not in local zips — try downloading from Flibusta
+$localPath = fetchMissingBook(intval($id), $ext);
 if ($localPath !== null) {
 	send_book_headers($downloadName);
 	readfile($localPath);
