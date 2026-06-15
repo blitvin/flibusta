@@ -114,4 +114,15 @@ echo FATAL: directory /flibusta with books is not found, exiting
 exit 1
 fi
 
+if [ -z "$FLIBUSTA_URL" ]; then
+echo WARNING: FLIBUSTA_URL is not set, please set it up in docker-compose.yml or .env file. Currently setting to default value https://flibusta.is
+export FLIBUSTA_URL=https://flibusta.is
+fi
+
+if [ -z "$FLIBUSTA_ENABLE_MISSING_BOOK_DOWNLOAD" ]; then
+echo WARNING: FLIBUSTA_ENABLE_MISSING_BOOK_DOWNLOAD is not set, please set it up in docker-compose.yml or .env file. Currently setting to default value true
+export FLIBUSTA_ENABLE_MISSING_BOOK_DOWNLOAD=true
+fi
+
+
 exec php-fpm
