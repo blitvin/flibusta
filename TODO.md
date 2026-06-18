@@ -5,7 +5,7 @@ List of unimplemented features/bug fixes
 3. ~~Fix books_zip table generation - overlaps in zip contents exist . This should also allow daily updates incorporation without additional user actions~~
 4. ~~Fix bookshelf~~
 5. ~~Fix exception when list of authors is shown in OPDS call~~
-6. Login screen is not suited for small devices like smartphones
+6. ~~Login screen is not suited for small devices like smartphones~~
 7. Extract books icon from books in local storage outside zips 
 
 Features
@@ -16,7 +16,7 @@ Features
 4. Module for adding new books to the library ( including correct work after DB recreation)
 5. Incremental updates of DB from import files
 6. Clean up and update documentation, reference to dockerhub images repository for the project, service section
-~~7. Fallback to retreiving required book from flibusta~~
+7. ~~Fallback to retreiving required book from flibusta~~
 8. On the fly fb2 to epub conversion. Rework of book_info fo fb2 - allow downloading as fb2 ,fb2.zip, epub
 9. Rework of authors page - list books of the author on the page , without need to go to search page
 10. Rework of book page  - remove description to distinct view to save space
