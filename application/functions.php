@@ -817,7 +817,6 @@ function checkOPDSLogin($pdo) {
 	$userIp = $_SERVER['REMOTE_ADDR'];
 	if ((TRUSTED_NET != '')  && ipInNetwork($userIp,TRUSTED_NET))
 		return ;  // client on trusted network, access grunted
-
 	$user = $_SERVER['PHP_AUTH_USER'] ?? null;
 	$pass = $_SERVER['PHP_AUTH_PW'] ?? null;
 
@@ -835,7 +834,12 @@ function checkOPDSLogin($pdo) {
 			return;
 	}
 
-	record_login_attempt($pdo,$user, LOGIN_OPDS_BAD_PASSWORD);
+	if (empty($user)) {
+		error_log("OPDS Auth failure: empty user from $userIp");
+	} else {
+		record_login_attempt($pdo,$user, LOGIN_OPDS_BAD_PASSWORD);
+	}
+	
 	header('WWW-Authenticate: Basic realm="My OPDS Library"');
 	header('HTTP/1.0 401 Unauthorized');
 	echo "<xml version='1.0' encoding='UTF-8' ?>
