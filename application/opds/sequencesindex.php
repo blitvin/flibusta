@@ -6,14 +6,14 @@ $letters = $_GET['letters'] ?? '';
 if ($letters !== '') {
     $length_letters = mb_strlen($letters, 'UTF-8');
 } else {
-    $length_letters = 0; // Установите подходящее значение по умолчанию
+    $length_letters = 0;
 }
 
 echo '<?xml version="1.0" encoding="utf-8"?>';
 echo <<< _XML
  <feed xmlns="http://www.w3.org/2005/Atom" xmlns:dc="http://purl.org/dc/terms/" xmlns:os="http://a9.com/-/spec/opensearch/1.1/" xmlns:opds="http://opds-spec.org/2010/catalog"> <id>tag:root:authors</id>
  <title>Книги по сериям</title>
- <updated>$cdt</updated>
+ <updated>$opds_updated</updated>
  <icon>/favicon.ico</icon>
  <link href="$webroot/opds-opensearch.xml.php" rel="search" type="application/opensearchdescription+xml" />
  <link href="$webroot/opds/authorsindex?letters={searchTerms}" rel="search" type="application/atom+xml" />
@@ -31,27 +31,29 @@ $bindparam1 = $letters."_";
 $ai->bindParam(":pattern",$bindparam1);
 $ai->execute();
 while ($ach = $ai->fetchObject()) {
-    if ($ach->cnt>30) {
-	    echo "\n<entry>\n <updated>$cdt</updated>";
-	    echo "<id>tag:sequences:".urlencode($ach->alpha)."</id>\n";
-	    echo "<title>".htmlspecialchars($ach->alpha)."</title>\n";
-	    echo "<content type='text'>$ach->cnt книжных серий на ".htmlspecialchars($ach->alpha)."</content>\n";
-        echo "<link href='$webroot/opds/sequencesindex?letters=".urlencode($ach->alpha)."' type='application/atom+xml;profile=opds-catalog' />\n";
-		echo "</entry>";
+	$alphax = htmlspecialchars($ach->alpha, ENT_QUOTES | ENT_XML1, 'UTF-8');
+    if ($ach->cnt > 30) {
+	    echo "\n<entry>";
+	    echo "<updated>$opds_updated</updated>";
+	    echo "<id>tag:sequences:" . urlencode($ach->alpha) . "</id>";
+	    echo "<title>$alphax</title>";
+	    echo "<content type=\"text\">" . intval($ach->cnt) . " книжных серий на $alphax</content>";
+        echo "<link href=\"$webroot/opds/sequencesindex?letters=" . urlencode($ach->alpha) . "\" type=\"application/atom+xml;profile=opds-catalog\" />";
+	    echo "</entry>";
 	} else {
-        // list individual serie
-        $sq = $dbh->prepare("SELECT SeqName, SeqId 
-                from libseqname 
+        $sq = $dbh->prepare("SELECT SeqName, SeqId
+                from libseqname
                 where UPPER(SUBSTR(SeqName, 1, ".($length_letters + 1).")) = :pattern
                 ORDER BY UPPER(SeqName)");
-        $sq->bindParam(":pattern",$ach->alpha);
+        $sq->bindParam(":pattern", $ach->alpha);
         $sq->execute();
         while($s = $sq->fetchObject()){
-            echo "\n<entry>\n <updated>$cdt</updated>";
-	        echo "<id>tag:sequence:$s->seqid</id>\n";
-            echo "<title>". htmlspecialchars($s->seqname)."</title>\n";
-            echo " <content type='text'></content>";
-	        echo " <link href='$webroot/opds/list?seq_id=" . $s->seqid . "' type='application/atom+xml;profile=opds-catalog' />";
+            echo "\n<entry>";
+	        echo "<updated>$opds_updated</updated>";
+	        echo "<id>tag:sequence:" . intval($s->seqid) . "</id>";
+            echo "<title>" . htmlspecialchars($s->seqname, ENT_QUOTES | ENT_XML1, 'UTF-8') . "</title>";
+            echo "<content type=\"text\"></content>";
+	        echo "<link href=\"$webroot/opds/list?seq_id=" . intval($s->seqid) . "\" type=\"application/atom+xml;profile=opds-catalog\" />";
 	        echo "</entry>";
         }
         $sq = null;

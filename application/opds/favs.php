@@ -5,8 +5,8 @@ echo <<< _XML
  <feed xmlns="http://www.w3.org/2005/Atom" xmlns:dc="http://purl.org/dc/terms/" xmlns:os="http://a9.com/-/spec/opensearch/1.1/" xmlns:opds="http://opds-spec.org/2010/catalog"> <id>tag:root</id>
  <title>Книжные полки</title>
  _XML;
- echo "<updated>$cdt</updated>";
- echo <<< _XML
+echo "<updated>$opds_updated</updated>";
+echo <<< _XML
  <icon>/favicon.ico</icon>
  <link href="$webroot/opds-opensearch.xml.php" rel="search" type="application/opensearchdescription+xml" />
  <link href="$webroot/opds/search?q={searchTerms}" rel="search" type="application/atom+xml" />
@@ -18,11 +18,13 @@ $favs = $dbh->prepare("SELECT * FROM fav_lists");
 $favs->execute();
 
 while ($fav = $favs->fetch()) {
-	echo "<entry> <updated>$cdt</updated>";
-	echo " <id>tag:fav:$fav->list_uuid</id>";
-	echo " <title>$fav->name</title>";
-	echo " <content type='text'></content>";
-	echo " <link href='$webroot/opds/fav/?uuid=$fav->list_uuid' type='application/atom+xml;profile=opds-catalog' />";
+	$namex = htmlspecialchars($fav->name, ENT_QUOTES | ENT_XML1, 'UTF-8');
+	echo "<entry>";
+	echo "<updated>$opds_updated</updated>";
+	echo "<id>tag:fav:" . htmlspecialchars($fav->list_uuid, ENT_QUOTES | ENT_XML1, 'UTF-8') . "</id>";
+	echo "<title>$namex</title>";
+	echo "<content type=\"text\"></content>";
+	echo "<link href=\"$webroot/opds/fav/?uuid=" . urlencode($fav->list_uuid) . "\" type=\"application/atom+xml;profile=opds-catalog\" />";
 	echo "</entry>";
 }
 

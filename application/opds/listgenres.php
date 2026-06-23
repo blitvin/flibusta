@@ -1,9 +1,10 @@
 <?php
 header('Content-Type: application/atom+xml; charset=utf-8');
 echo '<?xml version="1.0" encoding="utf-8"?>';
-echo '<feed xmlns="http://www.w3.org/2005/Atom" xmlns:dc="http://purl.org/dc/terms/" xmlns:os="http://a9.com/-/spec/opensearch/1.1/" xmlns:opds="http://opds-spec.org/2010/catalog"> <id>tag:root</id>';
-echo "<title>Жанры в ".$_GET['id']."</title>";
-echo "<updated>$cdt</updated>";
+$categoryTitle = htmlspecialchars($_GET['id'] ?? '', ENT_QUOTES | ENT_XML1, 'UTF-8');
+echo '<feed xmlns="http://www.w3.org/2005/Atom" xmlns:dc="http://purl.org/dc/terms/" xmlns:os="http://a9.com/-/spec/opensearch/1.1/" xmlns:opds="http://opds-spec.org/2010/catalog"><id>tag:root</id>';
+echo "<title>Жанры в $categoryTitle</title>";
+echo "<updated>$opds_updated</updated>";
 echo  <<< _XML
  <icon>/favicon.ico</icon>
  <link href="$webroot/opds-opensearch.xml.php" rel="search" type="application/opensearchdescription+xml" />
@@ -20,13 +21,14 @@ $gs->bindParam(":id", $_GET['id']);
 $gs->execute();
 
 while ($g = $gs->fetch()) {
-	echo "<entry> <updated>$cdt</updated>";
-	echo " <id>tag:genre:$g->genrecode</id>";
-	echo " <title>$g->genredesc</title>";
-	echo " <content type='text'>Книг: $g->cnt</content>";
-	echo " <link href='$webroot/opds/list/?genre_id=$g->genreid' type='application/atom+xml;profile=opds-catalog' />";
+	$descx = htmlspecialchars($g->genredesc, ENT_QUOTES | ENT_XML1, 'UTF-8');
+	echo "<entry>";
+	echo "<updated>$opds_updated</updated>";
+	echo "<id>tag:genre:" . htmlspecialchars($g->genrecode, ENT_QUOTES | ENT_XML1, 'UTF-8') . "</id>";
+	echo "<title>$descx</title>";
+	echo "<content type=\"text\">Книг: " . intval($g->cnt) . "</content>";
+	echo "<link href=\"$webroot/opds/list/?genre_id=" . intval($g->genreid) . "\" type=\"application/atom+xml;profile=opds-catalog\" />";
 	echo "</entry>\n";
 }
 echo '</feed>';
 ?>
-

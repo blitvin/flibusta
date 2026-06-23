@@ -650,27 +650,47 @@ function formatSizeUnits($bytes)
         return $bytes;
     }
 
+function opds_filetype_mime(string $filetype): string {
+	static $map = [
+		'fb2'  => 'application/fb2',
+		'epub' => 'application/epub+zip',
+		'pdf'  => 'application/pdf',
+		'djvu' => 'image/vnd.djvu',
+		'doc'  => 'application/msword',
+		'txt'  => 'text/plain',
+		'rtf'  => 'application/rtf',
+		'mobi' => 'application/x-mobipocket-ebook',
+		'chm'  => 'application/vnd.ms-htmlhelp',
+	];
+	return $map[strtolower(trim($filetype))] ?? 'application/octet-stream';
+}
+
 function opds_book($b,$webroot = '') {
 	global $dbh;
-	echo "\n<entry> <updated>" . $b->time . "</updated>";
-	echo " <id>tag:book:$b->bookid</id>";
-	echo " <title>" . htmlspecialchars($b->title) . "</title>";
+	$x = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES | ENT_XML1, 'UTF-8');
+
+	try {
+		$updated = (new DateTime($b->time))->format(DateTime::RFC3339);
+	} catch (Exception $e) {
+		$updated = $b->time;
+	}
+
+	echo "\n<entry><updated>" . $x($updated) . "</updated>";
+	echo "<id>tag:book:" . intval($b->bookid) . "</id>";
+	echo "<title>" . $x($b->title) . "</title>";
 
 	$ann = $dbh->prepare("SELECT body annotation FROM libbannotations WHERE bookid=:id LIMIT 1");
 	$ann->bindParam(":id", $b->bookid);
 	$ann->execute();
-	if ($tmp = $ann->fetch()) {
-		$an = $tmp->annotation;
-	} else {
-		$an = '';
-	}
-	$genres = $dbh->prepare("SELECT genrecode, GenreId, GenreDesc FROM libgenre 
+	$an = ($tmp = $ann->fetch()) ? $tmp->annotation : '';
+
+	$genres = $dbh->prepare("SELECT genrecode, GenreId, GenreDesc FROM libgenre
 		JOIN libgenrelist USING(GenreId)
 		WHERE bookid=:id");
 	$genres->bindParam(":id", $b->bookid);
 	$genres->execute();
 	while ($g = $genres->fetch()) {
-		echo "<category term='$webroot/subject/" . urlencode($g->genrecode) . "' label='$g->genredesc'/>";
+		echo "<category term=\"" . $x($webroot . '/subject/' . urlencode($g->genrecode)) . "\" label=\"" . $x($g->genredesc) . "\"/>";
 	}
 
 	$sq = '';
@@ -685,14 +705,13 @@ function opds_book($b,$webroot = '') {
 			$ssq .= " ($s->seqnumb) ";
 		}
 		$sq .= $ssq;
-		echo " <link href='$webroot/opds/list?seq_id=".$s->seqid."' rel='related' type='application/atom+xml' title='Все книги серии &quot;$ssq&quot;' />";
+		echo "<link href=\"" . $x("$webroot/opds/list?seq_id=" . intval($s->seqid)) . "\" rel=\"related\" type=\"application/atom+xml\" title=\"" . $x("Все книги серии «$ssq»") . "\" />";
 	}
 	if ($sq != '') {
 		$sq = "Сборник: $sq";
 	}
 
-
-	echo "<author>";
+	
 	$au = $dbh->prepare("SELECT AvtorId, LastName, FirstName, nickname, middlename, File FROM libavtor a
 		LEFT JOIN libavtorname USING(AvtorId)
 		LEFT JOIN libapics USING(AvtorId)
@@ -700,45 +719,41 @@ function opds_book($b,$webroot = '') {
 	$au->bindParam(":id", $b->bookid);
 	$au->execute();
 	while ($a = $au->fetch()) {
-		echo "<name>$a->lastname $a->firstname $a->middlename</name>";
-		echo "<uri>/opds/author?author_id=$a->avtorid</uri>";
+		echo "<author>";
+		echo "<name>" . $x("$a->lastname $a->firstname $a->middlename") . "</name>";
+		echo "<uri>/opds/author?author_id=" . intval($a->avtorid) . "</uri>";
+		echo "</author>";
 	}
-	echo "</author>";
+	
 	$au->execute();
 	while ($a = $au->fetch()) {
-		echo "\n <link href='$webroot/opds/list?author_id=$a->avtorid' rel='related' type='application/atom+xml' title='Все книги автора $a->lastname $a->firstname $a->middlename' />";
+		echo "\n<link href=\"" . $x("$webroot/opds/list?author_id=" . intval($a->avtorid)) . "\" rel=\"related\" type=\"application/atom+xml\" title=\"" . $x("Все книги автора $a->lastname $a->firstname $a->middlename") . "\" />";
 	}
-	echo " <dc:language>" . trim($b->lang) . "</dc:language>";
+	echo "<dc:language>" . $x(trim($b->lang)) . "</dc:language>";
 	if ($b->year > 0) {
-		echo " <dc:issued>$b->year</dc:issued>";
+		echo "<dc:issued>" . intval($b->year) . "</dc:issued>";
 	}
-	
-	// Include the type of the book as <dc:format> element
-	echo " <dc:format>" . trim($b->filetype) . "</dc:format>";
-	
-	// Include the size of the book as <dcterms:extent> element using the FileSize attribute from $b
-	echo " <dcterms:extent>" . formatSizeUnits($b->filesize) . " bytes</dcterms:extent>";
-	
-	echo "\n <summary type='text'>" . strip_tags($an);
-	echo "\n $sq ";
-	echo "\n $b->keywords";
-	if ($b->year > 0) {
-		echo "\n Год издания: $b->year";
-	}
-	echo "\n Формат: $b->filetype";
-	echo "\n Язык: $b->lang";
-	echo "\n Размер: " . formatSizeUnits($b->filesize);
-	echo "\n </summary>";
+	echo "<dc:format>" . $x(trim($b->filetype)) . "</dc:format>";
+	echo "<dcterms:extent>" . $b->filesize . "</dcterms:extent>";
 
-	echo "\n <link rel='http://opds-spec.org/image/thumbnail' href='$webroot/extract_cover.php?id=$b->bookid' type='image/jpeg'/>";
-	echo "\n <link rel='http://opds-spec.org/image' href='$webroot/extract_cover.php?id=$b->bookid' type='image/jpeg'/>";
-	if (trim($b->filetype) == 'fb2') {
-		$ur = 'fb2';
-	} else {
-		$ur = 'usr';
+	$cleanAn = strip_tags(preg_replace('/\[[^\]]*\]/', '', $an));
+	echo "\n<summary type=\"text\">" . $x($cleanAn);
+	echo "\n" . $x($sq);
+	echo "\n" . $x((string)($b->keywords ?? ''));
+	if ($b->year > 0) {
+		echo "\nГод издания: " . intval($b->year);
 	}
-	echo "\n <link href='$webroot/$ur.php?id=$b->bookid' rel='http://opds-spec.org/acquisition/open-access' type='application/" . trim($b->filetype) . "' />";
-	echo "\n <link href='$webroot/book/view/$b->bookid' rel='alternate' type='text/html' title='Книга на сайте' />";
+	echo "\nФормат: " . $x(trim($b->filetype));
+	echo "\nЯзык: " . $x(trim($b->lang));
+	echo "\nРазмер: " . $x(formatSizeUnits($b->filesize));
+	echo "\n</summary>";
+
+	echo "\n<link rel=\"http://opds-spec.org/image/thumbnail\" href=\"" . $x("$webroot/extract_cover.php?id=" . intval($b->bookid)) . "\" type=\"image/jpeg\"/>";
+	echo "\n<link rel=\"http://opds-spec.org/image\" href=\"" . $x("$webroot/extract_cover.php?id=" . intval($b->bookid)) . "\" type=\"image/jpeg\"/>";
+	$ur = (trim($b->filetype) == 'fb2') ? 'fb2' : 'usr';
+	$mime = opds_filetype_mime(trim($b->filetype));
+	echo "\n<link href=\"" . $x("$webroot/$ur.php?id=" . intval($b->bookid)) . "\" rel=\"http://opds-spec.org/acquisition/open-access\" type=\"$mime\" />";
+	echo "\n<link href=\"" . $x("$webroot/book/view/" . intval($b->bookid)) . "\" rel=\"alternate\" type=\"text/html\" title=\"Книга на сайте\" />";
 
 	echo "</entry>\n";
 }

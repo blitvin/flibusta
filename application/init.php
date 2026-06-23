@@ -13,6 +13,7 @@ define('BOOKS_PAGE', 10);
 define('AUTHORS_PAGE', 50);
 define('SERIES_PAGE', 50);
 define('OPDS_FEED_COUNT', 100);
+define('OPDS_AUTHORS_COUNT', 50);
 define('COUNT_BOOKS', true);
 include(ROOT_PATH . 'functions.php');
 include(ROOT_PATH . 'dbinit.php');
@@ -64,4 +65,5 @@ if ($tz !== false){
 error_reporting(E_ALL);
 
 $cdt = date('Y-m-d H:i:s');
+$opds_updated = date(DateTime::RFC3339);
 

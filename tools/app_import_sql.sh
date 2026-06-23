@@ -46,8 +46,8 @@ echo "Starting DB import" > /cache/log/dbupdate.log
 /tools/app_topg lib.libtranslator.sql  /cache/log/dbupdate.log
 /tools/app_topg lib.reviews.sql  /cache/log/dbupdate.log
 
-#echo "Подчистка БД. Стираем авторов, серии и жанры у которых нет ни одной книги"
-#$SQL_CMD -f /tools/cleanup_db.sql
+echo "Подчистка БД. Стираем авторов, серии и жанры у которых нет ни одной книги"
+$SQL_CMD -f /tools/cleanup_db.sql
 
 echo "Обновление полнотекстовых индексов"
 $SQL_CMD -f /tools/update_vectors.sql >> /cache/log/dbupdate.log

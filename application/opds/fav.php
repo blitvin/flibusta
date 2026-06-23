@@ -6,7 +6,7 @@ echo <<< _XML
 <id>tag:root:home</id>
 <title>Книги по авторам</title>
 _XML;
-echo "<updated>$cdt</updated>";
+echo "<updated>$opds_updated</updated>";
 echo <<< _XML
 <icon>/favicon.ico</icon>
 <link href="$webroot/opds-opensearch.xml.php" rel="search" type="application/opensearchdescription+xml" />

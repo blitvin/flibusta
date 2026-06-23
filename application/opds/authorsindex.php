@@ -6,14 +6,14 @@ $letters = $_GET['letters'] ?? '';
 if ($letters !== '') {
     $length_letters = mb_strlen($letters, 'UTF-8');
 } else {
-    $length_letters = 0; // Установите подходящее значение по умолчанию
+    $length_letters = 0;
 }
 
 echo '<?xml version="1.0" encoding="utf-8"?>';
 echo <<< _XML
  <feed xmlns="http://www.w3.org/2005/Atom" xmlns:dc="http://purl.org/dc/terms/" xmlns:os="http://a9.com/-/spec/opensearch/1.1/" xmlns:opds="http://opds-spec.org/2010/catalog"> <id>tag:root:authors</id>
  <title>Книги по авторам</title>
- <updated>$cdt</updated>
+ <updated>$opds_updated</updated>
  <icon>/favicon.ico</icon>
  <link href="$webroot/opds-opensearch.xml.php" rel="search" type="application/opensearchdescription+xml" />
  <link href="$webroot/opds/authorsindex?letters={searchTerms}" rel="search" type="application/atom+xml" />
@@ -34,16 +34,18 @@ $query = "
 $ai = $dbh->prepare($query);
 $ai->execute([$substr_len, $pattern]);
 while ($ach = $ai->fetchObject()) {
-	echo "\n<entry> <updated>$cdt</updated>";
-	echo "<id>tag:authors:$ach->alpha</id>";
-	echo "<title>$ach->alpha</title>";
-	echo "<content type='text'>$ach->cnt авторов на $ach->alpha</content>";
-	if ($ach->cnt>500) {
-		$url="$webroot/opds/authorsindex?letters=$ach->alpha";
+	$alphax = htmlspecialchars($ach->alpha, ENT_QUOTES | ENT_XML1, 'UTF-8');
+	echo "\n<entry>";
+	echo "<updated>$opds_updated</updated>";
+	echo "<id>tag:authors:" . urlencode($ach->alpha) . "</id>";
+	echo "<title>$alphax</title>";
+	echo "<content type=\"text\">" . intval($ach->cnt) . " авторов на $alphax</content>";
+	if ($ach->cnt > OPDS_AUTHORS_COUNT) {
+		$url = "$webroot/opds/authorsindex?letters=" . urlencode($ach->alpha);
 	} else {
-		$url="$webroot/opds/search?by=author&amp;q=$ach->alpha";
+		$url = "$webroot/opds/search?by=author&amp;q=" . urlencode($ach->alpha);
 	}
-	echo "<link href='$url' type='application/atom+xml;profile=opds-catalog' />";
+	echo "<link href=\"$url\" type=\"application/atom+xml;profile=opds-catalog\" />";
 	echo "</entry>";
 }
 echo '</feed>';

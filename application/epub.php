@@ -22,7 +22,7 @@ class EPub {
         // open file
         $this->file = $file;
         $zip = new ZipArchive();
-        if(!@$zip->open($this->file)){
+        if(@$zip->open($this->file) !== true){
             throw new Exception('Failed to read epub file');
         }
 
@@ -329,7 +329,7 @@ class EPub {
         $path = ltrim($path,'/');
 
         $zip = new ZipArchive();
-        if(!@$zip->open($this->file)){
+        if(@$zip->open($this->file) !== true){
             throw new Exception('Failed to read epub file');
         }
         $data = $zip->getFromName($path);

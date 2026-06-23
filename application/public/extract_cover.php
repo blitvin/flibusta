@@ -51,21 +51,22 @@ function lastm($path) {
 function extractFb2CoverFromZip($streamPath, $id) {
     $reader = new XMLReader();
     if (!$reader->open($streamPath)) {
+        error_log("extract_cover: fb2 $id: XMLReader failed to open $streamPath");
         return false;
     }
 
     $coverId = null;
 
-    // 2. First Pass: Find the coverpage image ID in the <description>
     while ($reader->read()) {
         if ($reader->nodeType == XMLReader::ELEMENT && $reader->localName === 'coverpage') {
             while ($reader->read()) {
                 if ($reader->nodeType == XMLReader::ELEMENT && $reader->localName === 'image') {
-                    // Look for the XLink href attribute (usually starts with #)
-                    $href = $reader->getAttribute('l:href') ?: $reader->getAttribute('xlink:href');
+                    $href = $reader->getAttribute('l:href')
+                         ?: $reader->getAttribute('xlink:href')
+                         ?: $reader->getAttributeNs('href', 'http://www.w3.org/1999/xlink');
                     if ($href) {
                         $coverId = ltrim($href, '#');
-                        break 2; // Found it, exit outer loop
+                        break 2;
                     }
                 }
                 if ($reader->nodeType == XMLReader::END_ELEMENT && $reader->localName === 'coverpage') {
@@ -73,39 +74,42 @@ function extractFb2CoverFromZip($streamPath, $id) {
                 }
             }
         }
-        // Stop searching description once we hit the body to save time
         if ($reader->nodeType == XMLReader::ELEMENT && $reader->localName === 'body') {
             break;
         }
     }
 
     if (!$coverId) {
+        error_log("extract_cover: fb2 $id: no coverpage image found in $streamPath");
         $reader->close();
         return false;
     }
 
-    // 3. Second Pass: Find the <binary> tag with the matching ID
     while ($reader->read()) {
         if ($reader->nodeType == XMLReader::ELEMENT && $reader->localName === 'binary') {
             if ($reader->getAttribute('id') === $coverId) {
-                // Get the base64 content. readInnerXml handles large text nodes efficiently
-                // as a stream in modern PHP versions.
-                $base64Data = $reader->readInnerXml();
-                
-                // Decode and save
+                $base64Data = $reader->readString();
                 $decoded = base64_decode($base64Data);
                 if ($decoded) {
-                    file_put_contents(CACHE_PATH . "covers/$id.jpg", $decoded);
-					$thm = resizeCover($decoded, 300, 400);
-					imagejpeg($thm, CACHE_PATH . "covers/$id-small.jpg", 75);
-					$thm = null;
-                    return true;
+                    $img = imagecreatefromstring($decoded);
+                    if ($img !== false) {
+                        imagejpeg($img, CACHE_PATH . "covers/$id.jpg", 90);
+                        $thm = resizeCover($decoded, 300, 400);
+                        imagejpeg($thm, CACHE_PATH . "covers/$id-small.jpg", 75);
+                        $thm = null;
+                        $reader->close();
+                        return true;
+                    }
+                    error_log("extract_cover: fb2 $id: imagecreatefromstring failed for cover '$coverId'");
+                } else {
+                    error_log("extract_cover: fb2 $id: base64_decode failed for cover '$coverId'");
                 }
                 break;
             }
         }
     }
 
+    error_log("extract_cover: fb2 $id: binary '$coverId' not found or decode failed");
     $reader->close();
     return false;
 }
@@ -120,7 +124,7 @@ function extractFb2CoverFromZip($streamPath, $id) {
  */
 function extractEpubCoverFromZip($zipPath, $epubName, $id) {
 	$zip = new ZipArchive(); 
-	if (!$zip->open($zipPath))
+	if ($zip->open($zipPath) !== true)
 		return false;
 	try {
 		$src = $zip->getStream($epubName);
@@ -193,26 +197,31 @@ $f = $stmt->fetch();
 if ($f !== false) {
 
 if (isset($f->file)) {
-	$zip = new ZipArchive(); 
-	if ($zip->open(CACHE_PATH . "lib.b.attached.zip")) {
+	$zip = new ZipArchive();
+	if ($zip->open(CACHE_PATH . "lib.b.attached.zip") === true) {
 		$fdata = $zip->getFromName($f->file);
+		$zip->close();
 		if (strlen($fdata) > 0) {
-			file_put_contents(CACHE_PATH . "covers/$id.jpg", $fdata);
-			$thm = resizeCover($fdata, 300, 400);
-			imagejpeg($thm, CACHE_PATH . "covers/$id-small.jpg", 75);
-			$thm = null;
-			if ($small) {
-				if (file_exists(CACHE_PATH . "covers/$id-small.jpg")) {
-					lastm(CACHE_PATH . "covers/$id-small.jpg");
-					die();
+			$img = imagecreatefromstring($fdata);
+			if ($img !== false) {
+				imagejpeg($img, CACHE_PATH . "covers/$id.jpg", 90);
+				$thm = resizeCover($fdata, 300, 400);
+				imagejpeg($thm, CACHE_PATH . "covers/$id-small.jpg", 75);
+				$thm = null;
+				if ($small) {
+					if (file_exists(CACHE_PATH . "covers/$id-small.jpg")) {
+						lastm(CACHE_PATH . "covers/$id-small.jpg");
+						die();
+					}
+				} else {
+					if (file_exists(CACHE_PATH . "covers/$id.jpg")) {
+						lastm(CACHE_PATH . "covers/$id.jpg");
+						die();
+					}
 				}
-			} else {
-				echo $fdata;
-				die();
 			}
 		}
 	}
-	$zip->close();
 }
 }
 $stmt = false;
@@ -232,46 +241,69 @@ if ($result !== false) {
 	die();
 }
 $stmt = null;
-$stmt = $dbh->prepare("SELECT filename FROM book_zip WHERE :id BETWEEN start_id AND end_id AND usr=$u");
-$stmt->bindParam(":id",$id);
-$stmt->execute();
-$result = $stmt->fetch();
-if (!$result){
-	echo file_get_contents('/application/none.jpg');
-	die();
-}
-$zip_name = $result->filename;
-$stmt = null;
-
-$zip = new ZipArchive(); 
-
-$stmt = $dbh->prepare("SELECT filename FROM libfilename where BookId=:id");
-$stmt->bindParam(":id",$id);
-$stmt->execute();
-$result = $stmt->fetch();
-
-if ($result) {
-    $filename = $result->filename;
-} else {
-    $filename = null;
-}
-if ($filename == '') {
-	$filename = trim("$id.$type");
-}
-$stmt = null;
 
 if ($type == 'fb2') {
 	$localFb2 = LOCAL_LIBRARY_PATH . $id . '.fb2';
-	if (!file_exists($localFb2) && strtolower(pathinfo($filename, PATHINFO_EXTENSION)) === 'zip') {
-		resolve_inner_zip_book($zip_name, $id, $filename, 'fb2');
-	}
 	if (file_exists($localFb2)) {
 		extractFb2CoverFromZip($localFb2, $id);
 	} else {
-		extractFb2CoverFromZip('zip://' . realpath($zip_name) . '#' . $filename, $id);
+		$stmt = $dbh->prepare("SELECT filename FROM book_zip WHERE :id BETWEEN start_id AND end_id AND usr=$u");
+		$stmt->bindParam(":id",$id);
+		$stmt->execute();
+		$result = $stmt->fetch();
+		if (!$result) {
+			error_log("extract_cover: fb2 $id: no book_zip entry and no local file");
+			echo file_get_contents('/application/none.jpg');
+			die();
+		}
+		$zip_name = $result->filename;
+		$stmt = null;
+		$stmt = $dbh->prepare("SELECT filename FROM libfilename where BookId=:id");
+		$stmt->bindParam(":id",$id);
+		$stmt->execute();
+		$result = $stmt->fetch();
+		$filename = $result ? $result->filename : null;
+		if ($filename == '') {
+			$filename = trim("$id.fb2");
+		}
+		$stmt = null;
+		if (strtolower(pathinfo($filename, PATHINFO_EXTENSION)) === 'zip') {
+			resolve_inner_zip_book($zip_name, $id, $filename, 'fb2');
+			if (file_exists($localFb2)) {
+				extractFb2CoverFromZip($localFb2, $id);
+			} else {
+				extractFb2CoverFromZip('zip://' . realpath($zip_name) . '#' . $filename, $id);
+			}
+		} else {
+			extractFb2CoverFromZip('zip://' . realpath($zip_name) . '#' . $filename, $id);
+		}
 	}
 } elseif ($type == 'epub') {
-	extractEpubCoverFromZip($zip_name,$filename,$id);
+	$stmt = $dbh->prepare("SELECT filename FROM book_zip WHERE :id BETWEEN start_id AND end_id AND usr=$u");
+	$stmt->bindParam(":id",$id);
+	$stmt->execute();
+	$result = $stmt->fetch();
+	if (!$result) {
+		error_log("extract_cover: epub $id: no book_zip entry");
+		echo file_get_contents('/application/none.jpg');
+		die();
+	}
+	$zip_name = $result->filename;
+	$stmt = null;
+	$stmt = $dbh->prepare("SELECT filename FROM libfilename where BookId=:id");
+	$stmt->bindParam(":id",$id);
+	$stmt->execute();
+	$result = $stmt->fetch();
+	$filename = $result ? $result->filename : null;
+	if ($filename == '') {
+		$filename = trim("$id.epub");
+	}
+	$stmt = null;
+	try {
+		extractEpubCoverFromZip($zip_name, $filename, $id);
+	} catch (Exception $e) {
+		error_log("extract_cover: epub $id: " . $e->getMessage());
+	}
 } else {
 	echo file_get_contents('/application/none.jpg');
 	die();
