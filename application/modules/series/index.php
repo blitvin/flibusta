@@ -13,22 +13,26 @@ $letter = 'А%';
 $get = '';
 
 if (isset($_GET['q'])) {
-	$get = mb_strtolower($_GET['q']);
-	$letter = '%' . $get;
-	$_SESSION['series_letter'] = $get;
+	if ($_GET['q'] == '') {
+		unset($_SESSION['series_q']);
+	} else {
+		$_SESSION['series_q'] = $_GET['q'];
+		unset($_SESSION['series_letter']);
+	}
+}
+if (isset($_GET['letter'])) {
+	$l = mb_strtolower($_GET['letter']);
+	unset($_SESSION['series_q']);
+	if ($l != '') {
+		$_SESSION['series_letter'] = $l;
+	} else {
+		unset($_SESSION['series_letter']);
+	}
 }
 
 if (isset($_SESSION['series_letter'])) {
 	$get = $_SESSION['series_letter'];
-}
-if (isset($_GET['letter'])) {
-	$get = mb_strtolower($_GET['letter']);
-}
-if ($get != '') {
-	$_SESSION['series_letter'] = $get;
-	$letter = $get . "%";
-} else {
-	unset($_SESSION['series_letter']);
+	$letter = $get . '%';
 }
 
 echo "<ul class='pagination'>";
@@ -70,18 +74,46 @@ echo "<form action='$webroot/series/'>\n";
 <?php
 $start = SERIES_PAGE * $page;
 
-$stmt = $dbh->prepare("SELECT COUNT(*) cnt FROM libseqname WHERE lower(libseqname.SeqName) LIKE :letter");
-$stmt->bindParam(":letter", $letter);
-$stmt->execute();
-$cnt = $stmt->fetch()->cnt;
+if (isset($_SESSION['series_q'])) {
+	$q = $_SESSION['series_q'];
+	$hasBooks = "EXISTS (SELECT 1 FROM libseq WHERE libseq.seqid=sn.seqid)";
 
-$stmt = $dbh->prepare("SELECT SeqName, SeqId,
-		(SELECT COUNT(*) FROM libseq WHERE libseq.SeqId=libseqname.SeqId) cnt
-		FROM libseqname 
-		WHERE LOWER(libseqname.SeqName) LIKE :letter
-		ORDER BY seqname LIMIT " . SERIES_PAGE . " OFFSET $start");
-$stmt->bindParam(":letter", $letter);
-$stmt->execute();
+	$cntStmt = $dbh->prepare("SELECT COUNT(*) cnt
+		FROM libseqname sn
+		JOIN libseqname_ts st ON st.seqid = sn.seqid
+		WHERE st.vector @@ websearch_to_tsquery('russian', :q)
+		AND $hasBooks");
+	$cntStmt->bindParam(':q', $q);
+	$cntStmt->execute();
+	$cnt = $cntStmt->fetch()->cnt;
+
+	$stmt = $dbh->prepare("SELECT sn.seqname, sn.seqid,
+			(SELECT COUNT(*) FROM libseq WHERE libseq.seqid=sn.seqid) cnt,
+			ts_rank(st.vector, websearch_to_tsquery('russian', :q2)) AS rank
+		FROM libseqname sn
+		JOIN libseqname_ts st ON st.seqid = sn.seqid
+		WHERE st.vector @@ websearch_to_tsquery('russian', :q3)
+		AND $hasBooks
+		ORDER BY rank DESC, sn.seqname
+		LIMIT " . SERIES_PAGE . " OFFSET $start");
+	$stmt->bindParam(':q2', $q);
+	$stmt->bindParam(':q3', $q);
+	$stmt->execute();
+} else {
+	$cntStmt = $dbh->prepare("SELECT COUNT(*) cnt FROM libseqname
+		WHERE lower(libseqname.SeqName) LIKE :letter");
+	$cntStmt->bindParam(":letter", $letter);
+	$cntStmt->execute();
+	$cnt = $cntStmt->fetch()->cnt;
+
+	$stmt = $dbh->prepare("SELECT SeqName, SeqId,
+			(SELECT COUNT(*) FROM libseq WHERE libseq.SeqId=libseqname.SeqId) cnt
+			FROM libseqname
+			WHERE LOWER(libseqname.SeqName) LIKE :letter
+			ORDER BY seqname LIMIT " . SERIES_PAGE . " OFFSET $start");
+	$stmt->bindParam(":letter", $letter);
+	$stmt->execute();
+}
 
 echo '<div class="row">';
 show_gpager(ceil($cnt / SERIES_PAGE), 5);

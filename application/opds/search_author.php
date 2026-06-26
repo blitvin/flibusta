@@ -24,31 +24,28 @@ $q = $_GET['q'] ?? '';
 if ($q === '') {
 	die(':(');
 }
-$queryParam = $q . '%';
-$authors = $dbh->prepare("SELECT *,
-		(SELECT COUNT(*) FROM libavtor, libbook WHERE
-		libbook.deleted='0' AND
-		libbook.bookid=libavtor.bookid AND
-		libavtor.avtorid=libavtorname.avtorid) cnt
-		FROM libavtorname
-		WHERE lastname ILIKE :q ORDER BY lastname, firstname");
-$authors->bindParam(":q", $queryParam);
+$authors = $dbh->prepare("SELECT an.*,
+		(SELECT COUNT(*) FROM libbook lb JOIN libavtor la ON lb.bookid=la.bookid
+		 WHERE lb.deleted='0' AND la.avtorid=an.avtorid) cnt,
+		ts_rank(at.vector, websearch_to_tsquery('russian', :q)) AS rank
+		FROM libavtorname an
+		JOIN libavtorname_ts at ON at.avtorid = an.avtorid
+		WHERE at.vector @@ websearch_to_tsquery('russian', :q2)
+		AND EXISTS (SELECT 1 FROM libavtor la JOIN libbook lb ON lb.bookid=la.bookid
+		            WHERE la.avtorid=an.avtorid AND lb.deleted='0')
+		ORDER BY rank DESC, an.lastname, an.firstname");
+$authors->bindParam(":q",  $q);
+$authors->bindParam(":q2", $q);
 $authors->execute();
 while ($a = $authors->fetch()) {
-	if ($a->cnt > 0) {
-		$namex = htmlspecialchars(trim("$a->lastname $a->firstname $a->middlename $a->nickname"), ENT_QUOTES | ENT_XML1, 'UTF-8');
-		$cntStmt = $dbh->prepare("SELECT COUNT(*) as cnt FROM libbook JOIN libavtor USING(bookid) WHERE deleted='0' AND avtorid=:aid");
-		$cntStmt->bindParam(':aid', $a->avtorid);
-		$cntStmt->execute();
-		$books_cnt = intval($cntStmt->fetch()->cnt);
-		echo "\n<entry>";
-		echo "<updated>$opds_updated</updated>";
-		echo "<id>tag:author:" . intval($a->avtorid) . "</id>";
-		echo "<title>$namex</title>";
-		echo "<content type=\"text\">$books_cnt книг</content>";
-		echo "<link href=\"$webroot/opds/author?author_id=" . intval($a->avtorid) . "\" type=\"application/atom+xml;profile=opds-catalog\" />";
-		echo "</entry>";
-	}
+	$namex = htmlspecialchars(trim("$a->lastname $a->firstname $a->middlename $a->nickname"), ENT_QUOTES | ENT_XML1, 'UTF-8');
+	echo "\n<entry>";
+	echo "<updated>$opds_updated</updated>";
+	echo "<id>tag:author:" . intval($a->avtorid) . "</id>";
+	echo "<title>$namex</title>";
+	echo "<content type=\"text\">" . intval($a->cnt) . " книг</content>";
+	echo "<link href=\"$webroot/opds/author?author_id=" . intval($a->avtorid) . "\" type=\"application/atom+xml;profile=opds-catalog\" />";
+	echo "</entry>";
 }
 ?>
 </feed>

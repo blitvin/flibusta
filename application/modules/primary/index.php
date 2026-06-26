@@ -17,9 +17,7 @@ if (isset($_GET['q'])) {
 	if ($_GET['q'] == '') {
 		unset($_SESSION['search']);
 	} else {
-		$get = mb_strtolower($_GET['q']);
-		$search = str_replace(' ', '&', $get);
-		$_SESSION['search'] = $search;
+		$_SESSION['search'] = $_GET['q'];
 	}
 }
 
@@ -147,11 +145,19 @@ if (isset($_SESSION['filter_series'])) {
 }
 
 if (isset($_SESSION['search'])) {
-	$filter .= "AND vector @@ to_tsquery('russian', :search) ";
-	$join .= 'LEFT JOIN libbook_ts USING(bookid) ';
+	$join .= 'LEFT JOIN libbook_ts bt ON bt.bookid = b.bookid ';
+	$filter .= "AND (bt.vector @@ websearch_to_tsquery('russian', :search)
+		OR EXISTS (
+			SELECT 1 FROM libavtor la2
+			JOIN libavtorname_ts at2 ON at2.avtorid = la2.avtorid
+			WHERE la2.bookid = b.bookid
+			AND at2.vector @@ websearch_to_tsquery('russian', :search2)
+		)) ";
+	$cols .= "ts_rank(COALESCE(bt.vector, to_tsvector('russian', '')), websearch_to_tsquery('russian', :search3)) AS _ts_rank, ";
+	$order = "_ts_rank DESC, $order";
 
 	$fcontent .= "<div class='badge bg-success p-1 text-white'>";
-	$fcontent .= "<a class='text-white' href='$webroot/?q'>" . $_SESSION['search'] . " <i class='fas fa-times-circle'></i></a></div> ";
+	$fcontent .= "<a class='text-white' href='$webroot/?q'>" . htmlspecialchars($_SESSION['search'], ENT_QUOTES, 'UTF-8') . " <i class='fas fa-times-circle'></i></a></div> ";
 }
 
 if (isset($_SESSION['filter_series']) && isset($_SESSION['user_id'])) {
@@ -207,7 +213,9 @@ if (isset($_SESSION['filter_series'])) {
 	$stmt->bindParam(":sid", $_SESSION['filter_series']);
 }
 if (isset($_SESSION['search'])) {
-	$stmt->bindParam(":search", $_SESSION['search']);
+	$stmt->bindParam(":search",  $_SESSION['search']);
+	$stmt->bindParam(":search2", $_SESSION['search']);
+	$stmt->bindParam(":search3", $_SESSION['search']);
 }
 
 
@@ -244,7 +252,8 @@ if (COUNT_BOOKS) {
 		$stt->bindParam(":sid", $_SESSION['filter_series']);
 	}
 	if (isset($_SESSION['search'])) {
-		$stt->bindParam(":search", $_SESSION['search']);
+		$stt->bindParam(":search",  $_SESSION['search']);
+		$stt->bindParam(":search2", $_SESSION['search']);
 	}
 
 	$stt->execute();

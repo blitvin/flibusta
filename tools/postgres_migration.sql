@@ -112,3 +112,6 @@ ALTER TABLE IF EXISTS public.user_settings ADD COLUMN IF NOT EXISTS last_book IN
 
 -- Allow anonymous (not-logged-in) sessions: user_id must be nullable
 ALTER TABLE IF EXISTS public.php_sessions ALTER COLUMN user_id DROP NOT NULL;
+
+-- Drop legacy seqname table (was empty; replaced by libseqname_ts for FTS)
+DROP TABLE IF EXISTS public.seqname CASCADE;

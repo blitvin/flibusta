@@ -685,19 +685,6 @@ CREATE TABLE public.seq (
 
 ALTER TABLE public.seq OWNER TO flibusta;
 
---
--- TOC entry 233 (class 1259 OID 16687)
--- Name: seqname; Type: TABLE; Schema: public; Owner: flibusta
---
-
-CREATE TABLE public.seqname (
-    seq_id integer NOT NULL,
-    name character varying(255) NOT NULL,
-    search_content tsvector NOT NULL
-);
-
-
-ALTER TABLE public.seqname OWNER TO flibusta;
 
 --
 -- TOC entry 234 (class 1259 OID 16698)
@@ -856,14 +843,6 @@ ALTER TABLE ONLY public.progress
 ALTER TABLE ONLY public.seq
     ADD CONSTRAINT seq_pkey PRIMARY KEY (book_id, seq_id);
 
-
---
--- TOC entry 3128 (class 2606 OID 33843)
--- Name: seqname seqname_seq; Type: CONSTRAINT; Schema: public; Owner: flibusta
---
-
-ALTER TABLE ONLY public.seqname
-    ADD CONSTRAINT seqname_seq PRIMARY KEY (seq_id);
 
 
 --
@@ -1411,13 +1390,6 @@ CREATE INDEX idx_libb_lower_p ON public.libbook USING btree (lower((title)::text
 CREATE INDEX idx_seqn_lower_p ON public.libseqname USING btree (lower((seqname)::text) varchar_pattern_ops);
 
 
---
--- TOC entry 3126 (class 1259 OID 34005)
--- Name: seqname_search_content2; Type: INDEX; Schema: public; Owner: flibusta
---
-
-CREATE INDEX seqname_search_content2 ON public.seqname USING gin (name public.gin_trgm_ops);
-
 
 --
 -- TOC entry 3125 (class 1259 OID 34006)
@@ -1435,13 +1407,6 @@ CREATE INDEX sequence_book_id ON public.seq USING btree (book_id);
 CREATE INDEX translation_book_id ON public.translation USING btree (book_id);
 
 
---
--- TOC entry 3140 (class 2606 OID 34033)
--- Name: seq seq_seq_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: flibusta
---
-
-ALTER TABLE ONLY public.seq
-    ADD CONSTRAINT seq_seq_id_fkey FOREIGN KEY (seq_id) REFERENCES public.seqname(seq_id);
 
 
 -- Completed on 2022-03-30 10:39:37 UTC

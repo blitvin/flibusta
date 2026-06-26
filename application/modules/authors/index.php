@@ -14,22 +14,26 @@ $letter = 'А%';
 $get = '';
 
 if (isset($_GET['q'])) {
-	$get = mb_strtolower($_GET['q']);
-	$letter = '%' . $get;
-	$_SESSION['authors_letter'] = $get;
+	if ($_GET['q'] == '') {
+		unset($_SESSION['authors_q']);
+	} else {
+		$_SESSION['authors_q'] = $_GET['q'];
+		unset($_SESSION['authors_letter']);
+	}
+}
+if (isset($_GET['letter'])) {
+	$l = mb_strtolower($_GET['letter']);
+	unset($_SESSION['authors_q']);
+	if ($l != '') {
+		$_SESSION['authors_letter'] = $l;
+	} else {
+		unset($_SESSION['authors_letter']);
+	}
 }
 
 if (isset($_SESSION['authors_letter'])) {
 	$get = $_SESSION['authors_letter'];
-}
-if (isset($_GET['letter'])) {
-	$get = mb_strtolower($_GET['letter']);
-}
-if ($get != '') {
-	$_SESSION['authors_letter'] = $get;
-	$letter = $get . "%";
-} else {
-	unset($_SESSION['series_letter']);
+	$letter = $get . '%';
 }
 
 echo "<ul class='pagination'>";
@@ -71,19 +75,51 @@ echo "<form action='$webroot/authors/'>\n";
 <?php
 $start = AUTHORS_PAGE * $page;
 
-$stmt = $dbh->prepare("SELECT COUNT(*) cnt FROM libavtorname WHERE lower(libavtorname.lastname) LIKE :letter");
-$stmt->bindParam(":letter", $letter);
-$stmt->execute();
-$cnt = $stmt->fetch()->cnt;
+if (isset($_SESSION['authors_q'])) {
+	$q = $_SESSION['authors_q'];
+	$hasBooks = "EXISTS (SELECT 1 FROM libavtor la JOIN libbook lb ON lb.bookid=la.bookid
+		WHERE la.avtorid=an.avtorid AND lb.deleted='0')";
 
-$stmt = $dbh->prepare("SELECT *,
-		(SELECT COUNT(*) FROM libavtor WHERE libavtor.avtorid=libavtorname.avtorid) cnt
-		FROM libavtorname
-		LEFT JOIN libapics USING(AvtorId)
-		WHERE LOWER(libavtorname.lastname) LIKE :letter
-		ORDER BY firstname LIMIT " . AUTHORS_PAGE . " OFFSET $start");
-$stmt->bindParam(":letter", $letter);
-$stmt->execute();
+	$cntStmt = $dbh->prepare("SELECT COUNT(*) cnt
+		FROM libavtorname an
+		JOIN libavtorname_ts at ON at.avtorid = an.avtorid
+		WHERE at.vector @@ websearch_to_tsquery('russian', :q)
+		AND $hasBooks");
+	$cntStmt->bindParam(':q', $q);
+	$cntStmt->execute();
+	$cnt = $cntStmt->fetch()->cnt;
+
+	$stmt = $dbh->prepare("SELECT an.*,
+			(SELECT COUNT(*) FROM libavtor la JOIN libbook lb ON lb.bookid=la.bookid
+			 WHERE lb.deleted='0' AND la.avtorid=an.avtorid) cnt,
+			ts_rank(at.vector, websearch_to_tsquery('russian', :q2)) AS rank,
+			lap.file
+		FROM libavtorname an
+		JOIN libavtorname_ts at ON at.avtorid = an.avtorid
+		LEFT JOIN libapics lap USING(avtorid)
+		WHERE at.vector @@ websearch_to_tsquery('russian', :q3)
+		AND $hasBooks
+		ORDER BY rank DESC, an.lastname
+		LIMIT " . AUTHORS_PAGE . " OFFSET $start");
+	$stmt->bindParam(':q2', $q);
+	$stmt->bindParam(':q3', $q);
+	$stmt->execute();
+} else {
+	$cntStmt = $dbh->prepare("SELECT COUNT(*) cnt FROM libavtorname
+		WHERE lower(libavtorname.lastname) LIKE :letter");
+	$cntStmt->bindParam(":letter", $letter);
+	$cntStmt->execute();
+	$cnt = $cntStmt->fetch()->cnt;
+
+	$stmt = $dbh->prepare("SELECT *,
+			(SELECT COUNT(*) FROM libavtor WHERE libavtor.avtorid=libavtorname.avtorid) cnt
+			FROM libavtorname
+			LEFT JOIN libapics USING(AvtorId)
+			WHERE LOWER(libavtorname.lastname) LIKE :letter
+			ORDER BY firstname LIMIT " . AUTHORS_PAGE . " OFFSET $start");
+	$stmt->bindParam(":letter", $letter);
+	$stmt->execute();
+}
 
 echo '<div class="row">';
 show_gpager(ceil($cnt / AUTHORS_PAGE), 5);
