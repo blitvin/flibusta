@@ -6,7 +6,8 @@ List of unimplemented features/bug fixes
 4. ~~Fix bookshelf~~
 5. ~~Fix exception when list of authors is shown in OPDS call~~
 6. ~~Login screen is not suited for small devices like smartphones~~
-7. Extract books icon from books in local storage outside zips 
+7. ~~Extract books icon from books in local storage outside zips~~
+8. Fix authors lists and authors search. Web GUI + OPDS
 
 Features
 
