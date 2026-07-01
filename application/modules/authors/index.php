@@ -96,7 +96,7 @@ if (isset($_SESSION['authors_q'])) {
 			lap.file
 		FROM libavtorname an
 		JOIN libavtorname_ts at ON at.avtorid = an.avtorid
-		LEFT JOIN libapics lap USING(avtorid)
+		LEFT JOIN libapics lap ON lap.avtorid = an.avtorid
 		WHERE at.vector @@ websearch_to_tsquery('russian', :q3)
 		AND $hasBooks
 		ORDER BY rank DESC, an.lastname
