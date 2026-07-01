@@ -116,7 +116,7 @@ if (isset($_SESSION['authors_q'])) {
 			FROM libavtorname
 			LEFT JOIN libapics USING(AvtorId)
 			WHERE LOWER(libavtorname.lastname) LIKE :letter
-			ORDER BY firstname LIMIT " . AUTHORS_PAGE . " OFFSET $start");
+			ORDER BY lastname, firstname LIMIT " . AUTHORS_PAGE . " OFFSET $start");
 	$stmt->bindParam(":letter", $letter);
 	$stmt->execute();
 }

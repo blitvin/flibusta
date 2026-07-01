@@ -48,47 +48,62 @@ function bbc2html($content) {
 
 
 function show_gpager($page_count, $block_size = 100) {
-	global $url;
-	if (isset($_GET['page'])) {
-		$page = intval($_GET['page']);
-	} else {
-		$page = 0;
+	$page = isset($_GET['page']) ? intval($_GET['page']) : 0;
+	if ($page_count <= 1) return;
+
+	$b1 = $page - $block_size;
+	$b2 = $block_size + $page;
+	if ($b1 < 1)           $b1 = 1;
+	if ($b2 > $page_count) $b2 = $page_count;
+
+	$display_page = $page + 1;
+
+	echo "<nav class='d-flex align-items-center flex-wrap gap-1 my-1'>";
+	echo "<ul class='pagination pagination-sm mb-0'>";
+
+	// First page
+	$dis = ($page == 0) ? ' disabled' : '';
+	echo "<li class='page-item$dis'><a class='page-link' href='?page=0' title='Первая страница'>"
+	   . "<i class='fas fa-angle-double-left'></i></a></li>";
+
+	// Previous block
+	if ($b1 > 1) {
+		echo "<li class='page-item'><a class='page-link' href='?page=", $b1 - 2,
+		     "' title='Предыдущие'><i class='fas fa-angle-left'></i></a></li>";
 	}
-	if ($page_count > 1) {
-		echo "<nav><ul class='pagination pagination-sm'>";
 
-		$b1 = $page - $block_size;
-		$b2 = $block_size + $page;
-
-
-		if ($b1 < 1) {
-			$b1 = 1;
-		}
-		if ($b2 > $page_count) {
-			$b2 = $page_count;
-		}
-
-    	if ($b1 > 1) {
- 			echo "<li class='page-item'><a class='page-link' href='?page=", $b1 - 2, "' aria-label='Previous'><span aria-hidden='true'><i class='fas fa-angle-left'></i></span></a></li>";
-	    	
-    	}
-
-		for ($p = $b1; $p <= $b2; $p++) {
-			if ($p == $page + 1) {
-				$pv = 'active';
-			} else {
-				$pv = '';
-			}
-			echo "<li class='page-item $pv'><a class='page-link' href='?page=", $p - 1, "'>$p</a></li>";
-		}
-		$pv = '';		
-    	
-    	if ($b2 < $page_count) {
-    		echo "<li class='page-item'><a class='page-link' href='?page=", $b2, "' aria-label='Next'><span aria-hidden='true'><i class='fas fa-angle-right'></i></span></a></li>";
-    	}
-
-		echo '</ul></nav>';
+	// Numbered pages
+	for ($p = $b1; $p <= $b2; $p++) {
+		$active = ($p == $display_page) ? ' active' : '';
+		echo "<li class='page-item$active'><a class='page-link' href='?page=", $p - 1, "'>$p</a></li>";
 	}
+
+	// Next block
+	if ($b2 < $page_count) {
+		echo "<li class='page-item'><a class='page-link' href='?page=$b2'"
+		   . " title='Следующие'><i class='fas fa-angle-right'></i></a></li>";
+	}
+
+	// Last page
+	$dis = ($page == $page_count - 1) ? ' disabled' : '';
+	echo "<li class='page-item$dis'><a class='page-link' href='?page=", $page_count - 1,
+	     "' title='Последняя страница'><i class='fas fa-angle-double-right'></i></a></li>";
+
+	echo "</ul>";
+
+	// Jump-to-page: onsubmit converts 1-based display value to 0-based page param
+	echo "<form class='d-inline-flex align-items-center ms-2' method='get'"
+	   . " onsubmit=\"this.elements['page'].value=Math.max(0,Math.min($page_count-1,"
+	   . "parseInt(this.elements['pdisp'].value||1)-1));return true;\">"
+	   . "<input type='hidden' name='page' value='$page'>"
+	   . "<small class='text-muted me-1'>Стр.</small>"
+	   . "<input type='number' name='pdisp' class='form-control form-control-sm' style='width:4.5rem'"
+	   . " min='1' max='$page_count' value='$display_page'>"
+	   . "<small class='text-muted mx-1'>/ $page_count</small>"
+	   . "<button type='submit' class='btn btn-sm btn-outline-secondary'>→</button>"
+	   . "</form>";
+
+	echo "</nav>";
 }
 
 
