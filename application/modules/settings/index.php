@@ -9,10 +9,11 @@ if ($current_user_id === 0) {
 
 $csrfToken = get_csrf_token();
 
-$stmt = $dbh->prepare("SELECT login_redirect FROM user_settings WHERE user_id = ?");
+$stmt = $dbh->prepare("SELECT login_redirect, author_default_tab FROM user_settings WHERE user_id = ?");
 $stmt->execute([$current_user_id]);
 $saved = $stmt->fetch();
-$login_redirect = $saved ? $saved->login_redirect : 'default';
+$login_redirect     = $saved ? $saved->login_redirect     : 'default';
+$author_default_tab = $saved ? $saved->author_default_tab : 'alpha';
 
 $password_success = '';
 $password_error   = '';
@@ -53,11 +54,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!in_array($new_redirect, ['default', 'favorites', 'genres', 'last_book'], true)) {
             $new_redirect = 'default';
         }
-        $stmt = $dbh->prepare("INSERT INTO user_settings (user_id, login_redirect) VALUES (?, ?)
-            ON CONFLICT (user_id) DO UPDATE SET login_redirect = EXCLUDED.login_redirect");
-        $stmt->execute([$current_user_id, $new_redirect]);
-        $login_redirect   = $new_redirect;
-        $settings_success = 'Настройки сохранены.';
+        $new_author_tab = $_POST['author_default_tab'] ?? 'alpha';
+        if (!in_array($new_author_tab, ['about', 'alpha', 'series', 'year'], true)) {
+            $new_author_tab = 'alpha';
+        }
+        $stmt = $dbh->prepare("INSERT INTO user_settings (user_id, login_redirect, author_default_tab) VALUES (?, ?, ?)
+            ON CONFLICT (user_id) DO UPDATE SET login_redirect = EXCLUDED.login_redirect,
+                                                author_default_tab = EXCLUDED.author_default_tab");
+        $stmt->execute([$current_user_id, $new_redirect, $new_author_tab]);
+        $login_redirect     = $new_redirect;
+        $author_default_tab = $new_author_tab;
+        $settings_success   = 'Настройки сохранены.';
     }
 }
 
@@ -66,6 +73,12 @@ $checked = [
     'favorites' => $login_redirect === 'favorites'  ? 'checked' : '',
     'genres'    => $login_redirect === 'genres'     ? 'checked' : '',
     'last_book' => $login_redirect === 'last_book'  ? 'checked' : '',
+];
+$tab_checked = [
+    'about'  => $author_default_tab === 'about'  ? 'checked' : '',
+    'alpha'  => $author_default_tab === 'alpha'  ? 'checked' : '',
+    'series' => $author_default_tab === 'series' ? 'checked' : '',
+    'year'   => $author_default_tab === 'year'   ? 'checked' : '',
 ];
 ?>
 
@@ -132,6 +145,38 @@ $checked = [
             <input class="form-check-input" type="radio" name="login_redirect" id="redirect_last_book"
               value="last_book" <?= $checked['last_book'] ?>>
             <label class="form-check-label" for="redirect_last_book">Последняя открытая книга</label>
+          </div>
+          <button type="submit" name="save_settings" class="btn btn-primary">Сохранить</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-5">
+    <div class="card mb-4">
+      <div class="card-header"><h5 class="mb-0">Вкладка по умолчанию на странице автора</h5></div>
+      <div class="card-body">
+        <form method="POST">
+          <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8') ?>">
+          <div class="form-check mb-2">
+            <input class="form-check-input" type="radio" name="author_default_tab" id="tab_about"
+              value="about" <?= $tab_checked['about'] ?>>
+            <label class="form-check-label" for="tab_about">Об авторе</label>
+          </div>
+          <div class="form-check mb-2">
+            <input class="form-check-input" type="radio" name="author_default_tab" id="tab_alpha"
+              value="alpha" <?= $tab_checked['alpha'] ?>>
+            <label class="form-check-label" for="tab_alpha">По алфавиту</label>
+          </div>
+          <div class="form-check mb-2">
+            <input class="form-check-input" type="radio" name="author_default_tab" id="tab_series"
+              value="series" <?= $tab_checked['series'] ?>>
+            <label class="form-check-label" for="tab_series">По сериям</label>
+          </div>
+          <div class="form-check mb-3">
+            <input class="form-check-input" type="radio" name="author_default_tab" id="tab_year"
+              value="year" <?= $tab_checked['year'] ?>>
+            <label class="form-check-label" for="tab_year">По году</label>
           </div>
           <button type="submit" name="save_settings" class="btn btn-primary">Сохранить</button>
         </form>

@@ -54,6 +54,7 @@ $SQL_CMD -f /tools/update_vectors.sql >> /cache/log/dbupdate.log
 
 echo "Создание индекса zip-файлов"
 php /tools/update_zip_list.php  >> /cache/log/dbupdate.log
+date > /cache/timestamps/app_reindex
 echo "Процесс обновления БД завершен"
 echo "app_import_sql.sh : finished" >&2 
 exec 200>&-

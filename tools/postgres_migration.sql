@@ -115,3 +115,6 @@ ALTER TABLE IF EXISTS public.php_sessions ALTER COLUMN user_id DROP NOT NULL;
 
 -- Drop legacy seqname table (was empty; replaced by libseqname_ts for FTS)
 DROP TABLE IF EXISTS public.seqname CASCADE;
+
+-- Add author_default_tab preference to user_settings
+ALTER TABLE IF EXISTS public.user_settings ADD COLUMN IF NOT EXISTS author_default_tab VARCHAR(10) NOT NULL DEFAULT 'alpha';

@@ -22,6 +22,7 @@ fi
 echo "Создание индекса zip-файлов"
 php /tools/update_zip_list.php  > /cache/log/update_zip_list.log
 echo "Сканирование zip-файлов завершено"
+date > /cache/timestamps/app_reindex
 
 echo "app_reindex_sql.sh : finished" >&2
 exec 200>&-
