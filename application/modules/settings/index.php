@@ -9,11 +9,12 @@ if ($current_user_id === 0) {
 
 $csrfToken = get_csrf_token();
 
-$stmt = $dbh->prepare("SELECT login_redirect, author_default_tab FROM user_settings WHERE user_id = ?");
+$stmt = $dbh->prepare("SELECT login_redirect, author_default_tab, book_view_mode FROM user_settings WHERE user_id = ?");
 $stmt->execute([$current_user_id]);
 $saved = $stmt->fetch();
 $login_redirect     = $saved ? $saved->login_redirect     : 'default';
 $author_default_tab = $saved ? $saved->author_default_tab : 'alpha';
+$book_view_mode     = $saved ? $saved->book_view_mode     : 'contentonly';
 
 $password_success = '';
 $password_error   = '';
@@ -58,12 +59,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!in_array($new_author_tab, ['about', 'alpha', 'series', 'year'], true)) {
             $new_author_tab = 'alpha';
         }
-        $stmt = $dbh->prepare("INSERT INTO user_settings (user_id, login_redirect, author_default_tab) VALUES (?, ?, ?)
-            ON CONFLICT (user_id) DO UPDATE SET login_redirect = EXCLUDED.login_redirect,
-                                                author_default_tab = EXCLUDED.author_default_tab");
-        $stmt->execute([$current_user_id, $new_redirect, $new_author_tab]);
+        $new_book_mode = $_POST['book_view_mode'] ?? 'contentonly';
+        if (!in_array($new_book_mode, ['withannotation', 'contentonly'], true)) {
+            $new_book_mode = 'contentonly';
+        }
+        $stmt = $dbh->prepare("INSERT INTO user_settings (user_id, login_redirect, author_default_tab, book_view_mode)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT (user_id) DO UPDATE SET login_redirect     = EXCLUDED.login_redirect,
+                                                author_default_tab = EXCLUDED.author_default_tab,
+                                                book_view_mode     = EXCLUDED.book_view_mode");
+        $stmt->execute([$current_user_id, $new_redirect, $new_author_tab, $new_book_mode]);
         $login_redirect     = $new_redirect;
         $author_default_tab = $new_author_tab;
+        $book_view_mode     = $new_book_mode;
         $settings_success   = 'Настройки сохранены.';
     }
 }
@@ -79,6 +87,10 @@ $tab_checked = [
     'alpha'  => $author_default_tab === 'alpha'  ? 'checked' : '',
     'series' => $author_default_tab === 'series' ? 'checked' : '',
     'year'   => $author_default_tab === 'year'   ? 'checked' : '',
+];
+$bvm_checked = [
+    'withannotation' => $book_view_mode === 'withannotation' ? 'checked' : '',
+    'contentonly'    => $book_view_mode === 'contentonly'    ? 'checked' : '',
 ];
 ?>
 
@@ -145,6 +157,28 @@ $tab_checked = [
             <input class="form-check-input" type="radio" name="login_redirect" id="redirect_last_book"
               value="last_book" <?= $checked['last_book'] ?>>
             <label class="form-check-label" for="redirect_last_book">Последняя открытая книга</label>
+          </div>
+          <button type="submit" name="save_settings" class="btn btn-primary">Сохранить</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-5">
+    <div class="card mb-4">
+      <div class="card-header"><h5 class="mb-0">Режим открытия книги по умолчанию</h5></div>
+      <div class="card-body">
+        <form method="POST">
+          <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8') ?>">
+          <div class="form-check mb-2">
+            <input class="form-check-input" type="radio" name="book_view_mode" id="bvm_content"
+              value="contentonly" <?= $bvm_checked['contentonly'] ?>>
+            <label class="form-check-label" for="bvm_content">Читать (только текст)</label>
+          </div>
+          <div class="form-check mb-3">
+            <input class="form-check-input" type="radio" name="book_view_mode" id="bvm_annotation"
+              value="withannotation" <?= $bvm_checked['withannotation'] ?>>
+            <label class="form-check-label" for="bvm_annotation">О книге (аннотация и отзывы)</label>
           </div>
           <button type="submit" name="save_settings" class="btn btn-primary">Сохранить</button>
         </form>

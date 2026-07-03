@@ -1516,7 +1516,8 @@ CREATE INDEX idx_token_selector ON public.user_tokens(selector);
 CREATE TABLE public.user_settings (
     user_id INT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
     login_redirect VARCHAR(20) NOT NULL DEFAULT 'default',
-    author_default_tab VARCHAR(10) NOT NULL DEFAULT 'alpha'
+    author_default_tab VARCHAR(10) NOT NULL DEFAULT 'alpha',
+    book_view_mode VARCHAR(15) NOT NULL DEFAULT 'contentonly'
 );
 
 ALTER TABLE public.user_settings OWNER TO :FLIBUSTA_DBUSER;

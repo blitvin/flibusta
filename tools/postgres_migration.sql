@@ -118,3 +118,6 @@ DROP TABLE IF EXISTS public.seqname CASCADE;
 
 -- Add author_default_tab preference to user_settings
 ALTER TABLE IF EXISTS public.user_settings ADD COLUMN IF NOT EXISTS author_default_tab VARCHAR(10) NOT NULL DEFAULT 'alpha';
+
+-- Add book_view_mode preference to user_settings
+ALTER TABLE IF EXISTS public.user_settings ADD COLUMN IF NOT EXISTS book_view_mode VARCHAR(15) NOT NULL DEFAULT 'contentonly';

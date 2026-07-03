@@ -199,7 +199,12 @@ function book_small_pg($book, $webroot='',$full = false) {
 		</form>";
 	}
 	
-	echo "</div></div></div>\n";
+	echo "</div>";
+	echo "<div class='btn-group w-100 mt-1' role='group'>";
+	echo "<a href='$webroot/book/view/$book->bookid/withannotation' class='btn btn-outline-info btn-sm'>О книге</a>";
+	echo "<a href='$webroot/book/view/$book->bookid/contentonly' class='btn btn-outline-primary btn-sm'>Читать</a>";
+	echo "</div>";
+	echo "</div></div>\n";
 }
 
 function book_info_pg($book, $webroot = '', $full = false) {
@@ -257,7 +262,12 @@ function book_info_pg($book, $webroot = '', $full = false) {
 		</form>";
 	}
 	echo "</div>";
-	
+
+	echo "<div class='btn-group w-100 mt-1' role='group'>";
+	echo "<a href='$webroot/book/view/$book->bookid/withannotation' class='btn btn-outline-info btn-sm'>О книге</a>";
+	echo "<a href='$webroot/book/view/$book->bookid/contentonly' class='btn btn-outline-primary btn-sm'>Читать</a>";
+	echo "</div>";
+
 	echo "</div><div class='col-sm-10'>";
 	echo "<div class='authors-list'>";
 	$stmt = $dbh->prepare("SELECT AvtorId, LastName, FirstName, nickname, middlename, File FROM libavtor a
@@ -518,6 +528,7 @@ function decode_gurl($webroot,$mobile = false)  {
 	$url->action = sanitize_route_token($action);
   $url->var1 = intval($var1);
   $url->var2 = intval($var2);
+  $url->var2_str = sanitize_route_token($var2);
   $url->var3 = intval($var3); 
   $url->title = '';
   $url->description = '';
