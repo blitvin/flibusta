@@ -19,7 +19,7 @@ Features
 5. Incremental updates of DB from import files
 6. Clean up and update documentation, reference to dockerhub images repository for the project, service section
 7. ~~Fallback to retreiving required book from flibusta~~
-8. On the fly fb2 to epub conversion. Rework of book_info fo fb2 - allow downloading as fb2 ,fb2.zip, epub
+8. ~~On the fly fb2 to epub conversion. Rework of book_info fo fb2 - allow downloading as fb2 ,fb2.zip, epub~~
 9. ~~Rework of authors page - list books of the author on the page , without need to go to search page~~
-10. Rework of book page  - remove description to distinct view to save space
+10. ~~Rework of book page  - remove description to distinct view to save space~~
 

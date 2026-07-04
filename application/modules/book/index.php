@@ -30,7 +30,7 @@ if (in_array($_selector, ['withannotation', 'contentonly'], true)) {
 
 // Mode toggle shown at the top of every book page
 $_bid = intval($url->var1);
-echo "<div class='d-flex align-items-center gap-2 mb-2'>";
+echo "<div class='d-flex align-items-center justify-content-center gap-2 mb-2'>";
 echo "<a href='$webroot/book/view/$_bid/withannotation' class='btn btn-sm "
     . ($view_mode === 'withannotation' ? 'btn-info' : 'btn-outline-info') . "'>О книге</a>";
 if ($view_mode === 'contentonly') {

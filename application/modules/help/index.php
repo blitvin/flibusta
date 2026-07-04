@@ -39,6 +39,9 @@ echo "<p>The project is distributed under the <strong>GPL v2</strong> license. T
 echo "<h6>Сторонние библиотеки и ресурсы / Third-party libraries and artifacts used in the project</h6>";
 echo "<p>Фоновое изображение на экране входа получено с сайта freepics.com по бесплатной лицензии. Изображение <a href='http://www.freepik.com'>Designed by macrovector / Freepik</a>.</p>";
 echo "<p>The background image on the login screen is obtained from freepics.com under a free license. The image is <a href='http://www.freepik.com'>Designed by macrovector / Freepik</a>.</p>";
+echo "<p>Проект использует утилиту <strong>fb2c</strong> для конвертации файлов fb2 в различныеформаты. Исходный код доступен на GitHub: <a href='https://github.com/rupor-github/fb2cng'>github.com/rupor-github/fb2cng</a>.</p>";
+echo "<p>The project uses the <strong>fb2c</strong> utility to convert fb2 files to various formats. The source code is available at <a href='https://github.com/rupor-github/fb2cng'>github.com/rupor-github/fb2cng</a>.</p>";
+
 echo "<p>Проект использует следующие сторонние библиотеки:</p>";
 echo "<p>The project uses the following third-party libraries:</p>";
 echo "<div class='table-responsive'>";

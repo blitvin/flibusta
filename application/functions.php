@@ -156,10 +156,8 @@ function book_small_pg($book, $webroot='',$full = false) {
 
 	$dt =DateTime::createFromFormat('Y-m-d H:i:se', $book->time)->format('Y-m-d');
 	if (trim($book->filetype) == 'fb2') {
-		$ft = 'success';
 		$fhref = "$webroot/fb2.php?id=$book->bookid";
 	} else {
-		$ft = 'secondary';
 		$fhref = "$webroot/usr.php?id=$book->bookid";
 	}
 
@@ -185,10 +183,39 @@ function book_small_pg($book, $webroot='',$full = false) {
 	}
 
 	echo "<div>$book->title</div></a>";
+
+	// Row 1: year + download (split dropdown for fb2, plain button for others)
 	echo "<div class='btn-group w-100 mt-auto' role='group'>";
 	echo "<button type='button' class='btn btn-outline-secondary btn-sm'>$year</button>";
-	echo "<a href='$fhref' title='Скачать' type='button' class='btn btn-outline-$ft btn-sm'>$book->filetype</a>";
-//	echo "<button type='button' class='btn btn-outline-secondary btn-sm'>$book->lang</button>";
+	if (trim($book->filetype) === 'fb2') {
+		$bid = intval($book->bookid);
+		echo "<a href='$fhref' class='btn btn-outline-success btn-sm'>fb2</a>";
+		echo "<div class='btn-group btn-group-sm' role='group'>";
+		echo "<button type='button' class='btn btn-outline-success btn-sm dropdown-toggle dropdown-toggle-split'"
+		   . " data-bs-toggle='dropdown' aria-expanded='false'>"
+		   . "<span class='visually-hidden'>Форматы</span></button>";
+		echo "<ul class='dropdown-menu dropdown-menu-end'>";
+		echo "<li><a class='dropdown-item' href='$webroot/fb2.php?id=$bid&final_format=zip' title='.fb2.zip'>.fb2.zip</a></li>";
+		echo "<li><a class='dropdown-item' href='$webroot/fb2.php?id=$bid&final_format=epub2'>epub2</a></li>";
+		echo "<li><a class='dropdown-item' href='$webroot/fb2.php?id=$bid&final_format=epub3'>epub3</a></li>";
+		echo "<li><a class='dropdown-item' href='$webroot/fb2.php?id=$bid&final_format=kepub'>kepub</a></li>";
+		echo "<li><a class='dropdown-item' href='$webroot/fb2.php?id=$bid&final_format=kfx'>kfx</a></li>";
+		echo "<li><a class='dropdown-item' href='$webroot/fb2.php?id=$bid&final_format=azw8'>azw8</a></li>";
+		echo "<li><hr class='dropdown-divider'></li>";
+		echo "<li><a class='dropdown-item' href='$webroot/fb2.php?id=$bid&final_format=pdf'>pdf</a></li>";
+		echo "<li><a class='dropdown-item' href='$webroot/fb2.php?id=$bid&final_format=txt'>txt</a></li>";
+		echo "<li><a class='dropdown-item' href='$webroot/fb2.php?id=$bid&final_format=md'>md</a></li>";
+		echo "</ul>";
+		echo "</div>";
+	} else {
+		echo "<a href='$fhref' title='Скачать' class='btn btn-outline-secondary btn-sm'>$book->filetype</a>";
+	}
+	echo "</div>";
+
+	// Row 2: О книге + Читать + (optional) Избранное
+	echo "<div class='btn-group w-100 mt-1' role='group'>";
+	echo "<a href='$webroot/book/view/$book->bookid/withannotation' class='btn btn-outline-info btn-sm'>О книге</a>";
+	echo "<a href='$webroot/book/view/$book->bookid/contentonly' class='btn btn-outline-primary btn-sm'>Читать</a>";
 	if ($show_fav_button) {
 		$fav_id = $book->bookid;
 		echo "<form method='POST' action='' style='display:inline;'>
@@ -198,11 +225,6 @@ function book_small_pg($book, $webroot='',$full = false) {
 			<button type='submit' title='В избранное' class='btn $fav btn-sm'><i class='fas fa-heart'></i></button>
 		</form>";
 	}
-	
-	echo "</div>";
-	echo "<div class='btn-group w-100 mt-1' role='group'>";
-	echo "<a href='$webroot/book/view/$book->bookid/withannotation' class='btn btn-outline-info btn-sm'>О книге</a>";
-	echo "<a href='$webroot/book/view/$book->bookid/contentonly' class='btn btn-outline-primary btn-sm'>Читать</a>";
 	echo "</div>";
 	echo "</div></div>\n";
 }
@@ -224,10 +246,8 @@ function book_info_pg($book, $webroot = '', $full = false) {
 
 	$dt =DateTime::createFromFormat('Y-m-d H:i:se', $book->time)->format('Y-m-d');
 	if (trim($book->filetype) == 'fb2') {
-		$ft = 'success';
 		$fhref = "$webroot/fb2.php?id=$book->bookid";
 	} else {
-		$ft = 'secondary';
 		$fhref = "$webroot/usr.php?id=$book->bookid";
 	}
 
@@ -236,12 +256,9 @@ function book_info_pg($book, $webroot = '', $full = false) {
 	} else {
 		$year = $dt;
 	}
-	
 
-	echo "<div class='btn-group w-100 mt-1' role='group'>";
-	echo "<button type='button' class='btn btn-outline-secondary btn-sm'>$year</button>";
-	echo "<a href='$fhref' title='Скачать' type='button' class='btn btn-outline-$ft btn-sm'>$book->filetype</a>";
-//	echo "<button type='button' class='btn btn-outline-secondary btn-sm'>$book->lang</button>";
+	$fav = 'btn-outline-secondary';
+	$fav_action = 'fav_book';
 	if ($current_user_id > 0) {
 		$stmt = $dbh->prepare("SELECT COUNT(*) cnt FROM fav WHERE user_id=:uid AND bookid=:id");
 		$stmt->bindParam(":uid", $current_user_id);
@@ -250,10 +267,42 @@ function book_info_pg($book, $webroot = '', $full = false) {
 		if ($stmt->fetch()->cnt > 0) {
 			$fav = 'btn-primary';
 			$fav_action = 'unfav_book';
-		} else {
-			$fav = 'btn-outline-secondary';
-			$fav_action = 'fav_book';
 		}
+	}
+
+	// Row 1: year + download (split dropdown for fb2, plain button for others)
+	echo "<div class='btn-group w-100 mt-1' role='group'>";
+	echo "<button type='button' class='btn btn-outline-secondary btn-sm'>$year</button>";
+	if (trim($book->filetype) === 'fb2') {
+		$bid = intval($book->bookid);
+		echo "<a href='$fhref' class='btn btn-outline-success btn-sm'>fb2</a>";
+		echo "<div class='btn-group btn-group-sm' role='group'>";
+		echo "<button type='button' class='btn btn-outline-success btn-sm dropdown-toggle dropdown-toggle-split'"
+		   . " data-bs-toggle='dropdown' aria-expanded='false'>"
+		   . "<span class='visually-hidden'>Форматы</span></button>";
+		echo "<ul class='dropdown-menu dropdown-menu-end'>";
+		echo "<li><a class='dropdown-item' href='$webroot/fb2.php?id=$bid&final_format=zip' title='.fb2.zip'>.fb2.zip</a></li>";
+		echo "<li><a class='dropdown-item' href='$webroot/fb2.php?id=$bid&final_format=epub2'>epub2</a></li>";
+		echo "<li><a class='dropdown-item' href='$webroot/fb2.php?id=$bid&final_format=epub3'>epub3</a></li>";
+		echo "<li><a class='dropdown-item' href='$webroot/fb2.php?id=$bid&final_format=kepub'>kepub</a></li>";
+		echo "<li><a class='dropdown-item' href='$webroot/fb2.php?id=$bid&final_format=kfx'>kfx</a></li>";
+		echo "<li><a class='dropdown-item' href='$webroot/fb2.php?id=$bid&final_format=azw8'>azw8</a></li>";
+		echo "<li><hr class='dropdown-divider'></li>";
+		echo "<li><a class='dropdown-item' href='$webroot/fb2.php?id=$bid&final_format=pdf'>pdf</a></li>";
+		echo "<li><a class='dropdown-item' href='$webroot/fb2.php?id=$bid&final_format=txt'>txt</a></li>";
+		echo "<li><a class='dropdown-item' href='$webroot/fb2.php?id=$bid&final_format=md'>md</a></li>";
+		echo "</ul>";
+		echo "</div>";
+	} else {
+		echo "<a href='$fhref' title='Скачать' class='btn btn-outline-secondary btn-sm'>$book->filetype</a>";
+	}
+	echo "</div>";
+
+	// Row 2: О книге + Читать + (optional) Избранное
+	echo "<div class='btn-group w-100 mt-1' role='group'>";
+	echo "<a href='$webroot/book/view/$book->bookid/withannotation' class='btn btn-outline-info btn-sm'>О книге</a>";
+	echo "<a href='$webroot/book/view/$book->bookid/contentonly' class='btn btn-outline-primary btn-sm'>Читать</a>";
+	if ($current_user_id > 0) {
 		echo "<form method='POST' action='' style='display:inline;'>
 			<input type='hidden' name='action' value='$fav_action' />
 			<input type='hidden' name='id' value='$book->bookid' />
@@ -261,11 +310,6 @@ function book_info_pg($book, $webroot = '', $full = false) {
 			<button type='submit' title='В избранное' class='btn $fav btn-sm'><i class='fas fa-heart'></i></button>
 		</form>";
 	}
-	echo "</div>";
-
-	echo "<div class='btn-group w-100 mt-1' role='group'>";
-	echo "<a href='$webroot/book/view/$book->bookid/withannotation' class='btn btn-outline-info btn-sm'>О книге</a>";
-	echo "<a href='$webroot/book/view/$book->bookid/contentonly' class='btn btn-outline-primary btn-sm'>Читать</a>";
 	echo "</div>";
 
 	echo "</div><div class='col-sm-10'>";
