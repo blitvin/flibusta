@@ -1,5 +1,13 @@
 <?php
 
+/**
+ * HTML-escape a value for safe interpolation into markup.
+ * Use for every DB-derived / imported string echoed into HTML.
+ */
+function h($s) {
+	return htmlspecialchars((string)($s ?? ''), ENT_QUOTES, 'UTF-8');
+}
+
 // CSRF token helpers
 function generate_csrf_token() {
 	if (!isset($_SESSION['csrf_token'])) {
@@ -43,7 +51,20 @@ function bbc2html($content) {
     '<a href="$2" target="_blank">$2</a>'
   );
 
-  return preg_replace($search, $replace, $content);
+  $out = preg_replace($search, $replace, $content);
+
+  // M2: neutralise dangerous hrefs (javascript:, data:, etc.) produced by [url] tags.
+  $out = preg_replace_callback(
+    '/<a href="([^"]*)"/i',
+    function ($m) {
+      $href = html_entity_decode($m[1], ENT_QUOTES, 'UTF-8');
+      $scheme = strtolower(parse_url($href, PHP_URL_SCHEME) ?? '');
+      $ok = ($scheme === 'http' || $scheme === 'https' || $scheme === 'mailto' || $scheme === '');
+      return '<a href="' . ($ok ? h($href) : '#') . '"';
+    },
+    $out
+  );
+  return $out;
 }
 
 
@@ -182,7 +203,7 @@ function book_small_pg($book, $webroot='',$full = false) {
 		}
 	}
 
-	echo "<div>$book->title</div></a>";
+	echo "<div>" . h($book->title) . "</div></a>";
 
 	// Row 1: year + download (split dropdown for fb2, plain button for others)
 	echo "<div class='btn-group w-100 mt-auto' role='group'>";
@@ -208,7 +229,7 @@ function book_small_pg($book, $webroot='',$full = false) {
 		echo "</ul>";
 		echo "</div>";
 	} else {
-		echo "<a href='$fhref' title='Скачать' class='btn btn-outline-secondary btn-sm'>$book->filetype</a>";
+		echo "<a href='$fhref' title='Скачать' class='btn btn-outline-secondary btn-sm'>" . h(trim($book->filetype)) . "</a>";
 	}
 	echo "</div>";
 
@@ -237,7 +258,7 @@ function book_info_pg($book, $webroot = '', $full = false) {
 	$current_user_id = isset($_SESSION['user_id']) ? intval($_SESSION['user_id']) : 0;
 	echo "<div class='hic card mb-3' itemscope='' itemtype='http://schema.org/Book'>";
 //	echo "<div class='card-header'>";
-	echo "<h4 class='rounded-top' style='background: #d0d0d0;'><a class='book-link' href='$webroot/book/view/$book->bookid'><i class='fas'></i> $book->title</h4></a>";
+	echo "<h4 class='rounded-top' style='background: #d0d0d0;'><a class='book-link' href='$webroot/book/view/" . intval($book->bookid) . "'><i class='fas'></i> " . h($book->title) . "</h4></a>";
 //	echo "</div>";
 	echo "<div class='card-body'>";
 	echo "<div class='row'>";
@@ -294,7 +315,7 @@ function book_info_pg($book, $webroot = '', $full = false) {
 		echo "</ul>";
 		echo "</div>";
 	} else {
-		echo "<a href='$fhref' title='Скачать' class='btn btn-outline-secondary btn-sm'>$book->filetype</a>";
+		echo "<a href='$fhref' title='Скачать' class='btn btn-outline-secondary btn-sm'>" . h(trim($book->filetype)) . "</a>";
 	}
 	echo "</div>";
 
@@ -325,7 +346,7 @@ function book_info_pg($book, $webroot = '', $full = false) {
 		if ($a->file != '') {
 			echo "<img class='rounded-circle contact' src='$webroot/extract_author.php?id=$a->avtorid' />";	
 		}
-		echo "<a href='$webroot/author/view/$a->avtorid'>$a->lastname $a->firstname $a->middlename $a->nickname</a>";
+		echo "<a href='$webroot/author/view/" . intval($a->avtorid) . "'>" . h("$a->lastname $a->firstname $a->middlename $a->nickname") . "</a>";
 		echo "</div>";
 	}
 	echo "</div>";
@@ -338,7 +359,7 @@ function book_info_pg($book, $webroot = '', $full = false) {
 	$genres->bindParam(":bookid", $book->bookid);
 	$genres->execute();
 	while ($g = $genres->fetch()) {
-		echo "<a class='badge bg-success p-1 text-white' href='$webroot/?gid=$g->genreid'>$g->genredesc</a> ";
+		echo "<a class='badge bg-success p-1 text-white' href='$webroot/?gid=" . intval($g->genreid) . "'>" . h($g->genredesc) . "</a> ";
 	}
 	echo "</div>";
 	
@@ -349,7 +370,7 @@ function book_info_pg($book, $webroot = '', $full = false) {
 	$seq->bindParam(":id", $book->bookid);
 	$seq->execute();
 	while ($s = $seq->fetch()) {
-		echo "<a class='badge bg-danger p-1 text-white' href='$webroot/?sid=$s->seqid'>$s->seqname ";
+		echo "<a class='badge bg-danger p-1 text-white' href='$webroot/?sid=" . intval($s->seqid) . "'>" . h($s->seqname) . " ";
 		if ($s->seqnumb > 0) {
 			echo " $s->seqnumb";
 		}
@@ -361,7 +382,7 @@ function book_info_pg($book, $webroot = '', $full = false) {
 	if ($book->keywords != '') {
 		$kw = explode(",", $book->keywords);
 		foreach ($kw as $k) {
-			echo "<a class='badge bg-secondary p-1 text-white' href='#'>$k</a> ";
+			echo "<a class='badge bg-secondary p-1 text-white' href='#'>" . h($k) . "</a> ";
 		}
 	}
 	echo "</div>";
@@ -653,7 +674,7 @@ function allowed_route_modules() {
 }
 
 function safe_str($str) {
-        return ($str)?preg_replace("/[^A-Za-z0-9 -_]/", '', $str):$str;
+        return ($str)?preg_replace("/[^A-Za-z0-9 _-]/", '', $str):$str;
 }
 
 
@@ -841,16 +862,22 @@ function isValidIpOrSubnet(string $value): bool {
 }
 
 function ipInNetwork($ip, $range) {
-	if (strpos($range,'/') == false) {
+	if (strpos($range, '/') === false) {
 		return $ip === $range;
 	}
 
 	list($subnet, $bits) = explode('/', $range);
-	$id = ip2long($ip);
-	$subnet = ip2long($subnet);
-	$mask = -1 << (32 - $bits);
-	$subnet &= $mask;
-	return ($ip & $mask) == $subnet;
+	$ipLong     = ip2long($ip);
+	$subnetLong = ip2long($subnet);
+	if ($ipLong === false || $subnetLong === false) {
+		return false;
+	}
+	$bits = (int)$bits;
+	if ($bits < 0 || $bits > 32) {
+		return false;
+	}
+	$mask = ($bits === 0) ? 0 : (-1 << (32 - $bits));
+	return (($ipLong & $mask) === ($subnetLong & $mask));
 }
 
 define('LOGIN_OK',0);
@@ -967,6 +994,7 @@ function login($pdo, $username, $password, $webroot,$set_remember_me) {
 
 	if ($user && password_verify($password, $user->password_hash)) {
 		record_login_attempt($pdo, $username, LOGIN_OK);
+		session_regenerate_id(true); // L1: prevent session fixation on login
 		$_SESSION['user_id'] = $user->id;
 		$_SESSION['username'] = $username;
 		$_SESSION['is_admin'] = (bool) $user->is_admin;
@@ -1057,6 +1085,7 @@ function checkRememberMe($pdo, $webroot) {
 		$stmt->execute([$selector]);
 		$tokenData = $stmt->fetch();
 		if ($tokenData && hash_equals($tokenData['token_hash'], hash('sha256',$validator))) {
+			session_regenerate_id(true); // L1: prevent session fixation on remember-me login
 			$_SESSION['user_id'] = $tokenData->user_id;
 			$_SESSION['username'] = htmlspecialchars($tokenData->username);
 			$_SESSION['is_admin'] = (bool) $tokenData->is_admin;

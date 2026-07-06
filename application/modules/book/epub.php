@@ -4,6 +4,7 @@ $savedCfi = '';
 $saveEpubUrl = '';
 if ($current_user_id > 0) {
 	$saveEpubUrl = $webroot . '/save_epub_position.php';
+	$saveCsrf    = get_csrf_token();
 	$stmt = $dbh->prepare("SELECT cfi FROM epub_progress WHERE user_id=:uid AND bookid=:id LIMIT 1");
 	$stmt->bindParam(":uid", $current_user_id);
 	$stmt->bindParam(":id", $url->var1);
@@ -37,6 +38,7 @@ r.themes.default({
 <?php if ($current_user_id > 0): ?>
 var saveEpubUrl = <?= json_encode($saveEpubUrl, JSON_UNESCAPED_SLASHES) ?>;
 var epubBookId = <?= (int)$url->var1 ?>;
+var epubCsrf = <?= json_encode($saveCsrf) ?>;
 var saveCfiTimeout;
 
 r.on("locationChanged", function(location) {
@@ -47,7 +49,7 @@ r.on("locationChanged", function(location) {
 		var xhr = new XMLHttpRequest();
 		xhr.open("POST", saveEpubUrl, true);
 		xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
-		xhr.send("bookid=" + epubBookId + "&cfi=" + encodeURIComponent(cfi));
+		xhr.send("bookid=" + encodeURIComponent(epubBookId) + "&cfi=" + encodeURIComponent(cfi) + "&csrf_token=" + encodeURIComponent(epubCsrf));
 	}, 500);
 });
 <?php endif; ?>

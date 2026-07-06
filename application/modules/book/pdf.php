@@ -3,8 +3,9 @@ $current_user_id = isset($_SESSION['user_id']) ? intval($_SESSION['user_id']) : 
 $savedPos = 0;
 $savePositionUrlPrefix = '';
 if ($current_user_id > 0) {
-    $savePositionUrlPrefix = $webroot . '/save_position.php?' .
-        http_build_query(['bookid' => (int)$url->var1]) . '&pos=';
+    $savePositionUrl = $webroot . '/save_position.php';
+    $saveBookId      = (int)$url->var1;
+    $saveCsrf        = get_csrf_token();
     $stmt = $dbh->prepare("SELECT pos FROM progress WHERE user_id=:uid AND bookid=:id LIMIT 1");
     $stmt->bindParam(":uid", $current_user_id);
     $stmt->bindParam(":id", $url->var1);
@@ -39,11 +40,14 @@ var canvas = document.getElementById('pdf-canvas');
 var ctx = canvas.getContext('2d');
 
 <?php if ($current_user_id > 0): ?>
-var savePositionUrlPrefix = <?= json_encode($savePositionUrlPrefix, JSON_UNESCAPED_SLASHES) ?>;
+var savePositionUrl = <?= json_encode($savePositionUrl, JSON_UNESCAPED_SLASHES) ?>;
+var saveBookId = <?= (int)$saveBookId ?>;
+var saveCsrf = <?= json_encode($saveCsrf) ?>;
 function savePage(pageNum) {
     var x = new XMLHttpRequest();
-    x.open("GET", savePositionUrlPrefix + pageNum, true);
-    x.send(null);
+    x.open("POST", savePositionUrl, true);
+    x.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+    x.send("bookid=" + encodeURIComponent(saveBookId) + "&pos=" + encodeURIComponent(pageNum) + "&csrf_token=" + encodeURIComponent(saveCsrf));
 }
 <?php else: ?>
 function savePage(pageNum) {}

@@ -1,20 +1,24 @@
 <?php
 $current_user_id = isset($_SESSION['user_id']) ? intval($_SESSION['user_id']) : 0;
 if ($current_user_id > 0) {
-	$savePositionUrlPrefix = $webroot . '/save_position.php?' . http_build_query(array(
-		'bookid' => (int)$url->var1,
-	)) . '&pos=';
+	$savePositionUrl = $webroot . '/save_position.php';
+	$saveBookId      = (int)$url->var1;
+	$saveCsrf        = get_csrf_token();
 	?>
 	<script>
 	var isScrolling;
-	var savePositionUrlPrefix = <?php echo json_encode($savePositionUrlPrefix, JSON_UNESCAPED_SLASHES); ?>;
+	var savePositionUrl = <?php echo json_encode($savePositionUrl, JSON_UNESCAPED_SLASHES); ?>;
+	var saveBookId = <?php echo (int)$saveBookId; ?>;
+	var saveCsrf = <?php echo json_encode($saveCsrf); ?>;
 
 	window.addEventListener('scroll', function (event) {
 		window.clearTimeout(isScrolling);
 		isScrolling = setTimeout(function() {
+			var pos = 100 / document.body.scrollHeight * window.scrollY;
 			var x = new XMLHttpRequest();
-			x.open("GET", savePositionUrlPrefix + (100 / document.body.scrollHeight * this.scrollY), true);
-			x.send(null);
+			x.open("POST", savePositionUrl, true);
+			x.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+			x.send("bookid=" + encodeURIComponent(saveBookId) + "&pos=" + encodeURIComponent(pos) + "&csrf_token=" + encodeURIComponent(saveCsrf));
 		}, 66);
 	}, false);
 	</script>

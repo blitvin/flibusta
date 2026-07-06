@@ -3,8 +3,9 @@ $current_user_id = isset($_SESSION['user_id']) ? intval($_SESSION['user_id']) : 
 $savedPage = 1;
 $saveDjvuUrlPrefix = '';
 if ($current_user_id > 0) {
-	$saveDjvuUrlPrefix = $webroot . '/save_djvu_position.php?' .
-		http_build_query(['bookid' => (int)$url->var1]) . '&page=';
+	$saveDjvuUrl = $webroot . '/save_djvu_position.php';
+	$saveBookId  = (int)$url->var1;
+	$saveCsrf    = get_csrf_token();
 	$stmt = $dbh->prepare("SELECT page FROM djvu_progress WHERE user_id=:uid AND bookid=:id LIMIT 1");
 	$stmt->bindParam(":uid", $current_user_id);
 	$stmt->bindParam(":id", $url->var1);
@@ -26,7 +27,9 @@ window.ViewerInstance.configure({
 });
 
 <?php if ($current_user_id > 0): ?>
-var saveDjvuUrlPrefix = <?= json_encode($saveDjvuUrlPrefix, JSON_UNESCAPED_SLASHES) ?>;
+var saveDjvuUrl = <?= json_encode($saveDjvuUrl, JSON_UNESCAPED_SLASHES) ?>;
+var saveBookId = <?= (int)$saveBookId ?>;
+var saveCsrf = <?= json_encode($saveCsrf) ?>;
 var saveDjvuTimeout;
 
 window.ViewerInstance.on(DjVu.Viewer.Events.PAGE_NUMBER_CHANGED, function() {
@@ -34,8 +37,9 @@ window.ViewerInstance.on(DjVu.Viewer.Events.PAGE_NUMBER_CHANGED, function() {
 	clearTimeout(saveDjvuTimeout);
 	saveDjvuTimeout = setTimeout(function() {
 		var x = new XMLHttpRequest();
-		x.open("GET", saveDjvuUrlPrefix + page, true);
-		x.send(null);
+		x.open("POST", saveDjvuUrl, true);
+		x.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+		x.send("bookid=" + encodeURIComponent(saveBookId) + "&page=" + encodeURIComponent(page) + "&csrf_token=" + encodeURIComponent(saveCsrf));
 	}, 300);
 });
 <?php endif; ?>

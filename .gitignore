@@ -3,3 +3,8 @@ Flibusta.Net/*
 FlibustaSQL/*
 .vscode/*
 .claude/*
+testing/*
+
+# H1: never commit real secrets; ship *.example templates only
+secrets/*
+!secrets/*.example

@@ -1,7 +1,9 @@
 <?php
-if (isset($_GET['id'])) {
-	$id = $_GET['id'];
+// H2: validate id exactly like fb2.php / extract_author.php do.
+if (isset($_GET['id']) && ctype_digit($_GET['id'])) {
+	$id = (int)$_GET['id'];
 } else {
+	http_response_code(400);
 	die();
 }
 error_reporting(E_ALL);

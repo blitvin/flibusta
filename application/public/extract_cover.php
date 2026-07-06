@@ -247,8 +247,9 @@ if ($type == 'fb2') {
 	if (file_exists($localFb2)) {
 		extractFb2CoverFromZip($localFb2, $id);
 	} else {
-		$stmt = $dbh->prepare("SELECT filename FROM book_zip WHERE :id BETWEEN start_id AND end_id AND usr=$u");
+		$stmt = $dbh->prepare("SELECT filename FROM book_zip WHERE :id BETWEEN start_id AND end_id AND usr=:u");
 		$stmt->bindParam(":id",$id);
+		$stmt->bindParam(":u",$u);
 		$stmt->execute();
 		$result = $stmt->fetch();
 		if (!$result) {
@@ -279,8 +280,9 @@ if ($type == 'fb2') {
 		}
 	}
 } elseif ($type == 'epub') {
-	$stmt = $dbh->prepare("SELECT filename FROM book_zip WHERE :id BETWEEN start_id AND end_id AND usr=$u");
+	$stmt = $dbh->prepare("SELECT filename FROM book_zip WHERE :id BETWEEN start_id AND end_id AND usr=:u");
 	$stmt->bindParam(":id",$id);
+	$stmt->bindParam(":u",$u);
 	$stmt->execute();
 	$result = $stmt->fetch();
 	if (!$result) {
