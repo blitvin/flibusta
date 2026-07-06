@@ -8,10 +8,16 @@ services:
             - './application:/application'
         environment:
             - POSTGRES_USER=flibusta
-            - POSTGRES_PASSWORD=flibusta
+            # H1: load DB password from a secret file, not inline plaintext.
+            - POSTGRES_PASSWORD_FILE=/run/secrets/POSTGRES_PWD
             - POSTGRES_DB=flibusta
-        ports:
-            - '27101:5432'
+        secrets:
+            - POSTGRES_PWD
+        # M6: DB reachable over the compose network by service name.
+        # Do NOT publish to the host unless you need external DB access.
+        # If you do, bind to localhost only:
+        # ports:
+        #     - '127.0.0.1:27101:5432'
 
     webserver:
         image: 'nginx:alpine'
@@ -42,7 +48,9 @@ services:
             - FLIBUSTA_APP_ADMIN=flibustadmin
             - FLIBUSTA_APP_ADMIN_PASSWORD_FILE=/run/secrets/FLIBUSTA_APP_ADMIN_PWD
             - FLIBUSTA_TURSTED_NET='192.168.1.0/24'
-            - FLIBUSTA_ALLOW_ADMIN_ACCESS_BY_HTTP='true'
+            # M1: admin over plaintext HTTP is insecure. Leave disabled in production.
+            # Uncomment ONLY for local development behind a trusted network:
+            # - FLIBUSTA_ALLOW_ADMIN_ACCESS_BY_HTTP=true
             - FLIBUSTA_URL=https://flibusta.is
             - FLIBUSTA_ENABLE_MISSING_BOOK_DOWNLOAD=true
         secrets:
@@ -54,6 +62,8 @@ services:
 volumes:
     db-data:
 secrets:
+    POSTGRES_PWD:
+        file: ./secrets/postgres_admin_pwd.txt
     FLIBUSTA_PWD:
         file: ./secrets/flibusta_pwd.txt
     FLIBUSTA_APP_ADMIN_PWD:

@@ -31,7 +31,10 @@ try {
 	$dbh->setAttribute(PDO::ATTR_EMULATE_PREPARES, false);
 	$dbh->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_OBJ);
 } catch(Exception $e) {
-	print_r($e);
+	// L3: never leak connection details (DSN/host) to output.
+	error_log('Flibusta DB connection failed: ' . $e->getMessage());
+	http_response_code(500);
+	die('Database temporarily unavailable.');
 }
 
 ?>
