@@ -46,6 +46,9 @@ echo "Starting DB import" > /cache/log/dbupdate.log
 /tools/app_topg lib.libtranslator.sql  /cache/log/dbupdate.log
 /tools/app_topg lib.reviews.sql  /cache/log/dbupdate.log
 
+echo "Очистка HTML в аннотациях (allow-list sanitizer)"
+php /application/sanitize_annotations.php >> /cache/log/dbupdate.log 2>&1
+
 echo "Подчистка БД. Стираем авторов, серии и жанры у которых нет ни одной книги"
 $SQL_CMD -f /tools/cleanup_db.sql
 
