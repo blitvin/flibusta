@@ -23,6 +23,10 @@ function serviceName2Label($opname) {
 			return "Скачать последние обновления";
 		case 'unlockdb':
 			return "Выйти из режима техобслуживания";
+		case 'addmagnet':
+			return "Добавить книги по magnet-ссылке";
+		case 'addtorrent':
+			return "Добавить книги из torrent-файла";
 		default:
 			return htmlspecialchars($opname, ENT_QUOTES, 'UTF-8');
 	}
@@ -112,8 +116,36 @@ serviceActionButton('getcovers', 'Скачать обложки', 'btn-warning',
 echo '</td><td>';
 serviceActionButton('getdaily', 'Скачать последние обновления', 'btn-warning', $service_csrf_token);
 echo '</td></tr>';
+$safeToken = htmlspecialchars($service_csrf_token, ENT_QUOTES, 'UTF-8');
 echo <<< __HTML
 </tbody></table>
+</div>
+</div>
+</div>
+</div>
+
+<div class='row'>
+<div class="col-sm-12 mt-3">
+<div class='card'>
+<h4 class="rounded-top p-1" style="background: #d0d0d0;">Добавить книги из торрента</h4>
+<div class='card-body'>
+<form method='POST' class='mb-3'>
+<input type='hidden' name='csrf_token' value='$safeToken'>
+<label class='form-label mb-1'>Magnet-ссылка</label>
+<div class='d-flex align-items-start flex-wrap gap-2'>
+<input type='text' name='magnet' placeholder='magnet:?xt=urn:btih:...' required class='form-control m-1' style='min-width: 22rem; flex: 1 1 30rem;'>
+<button class='btn btn-warning m-1' type='submit' name='addmagnet'>Добавить по magnet</button>
+</div>
+</form>
+<form method='POST' enctype='multipart/form-data'>
+<input type='hidden' name='csrf_token' value='$safeToken'>
+<label class='form-label mb-1'>Torrent-файл</label>
+<div class='d-flex align-items-start flex-wrap gap-2'>
+<input type='file' name='torrentfile' accept='.torrent,application/x-bittorrent' required class='form-control m-1' style='max-width: 30rem;'>
+<button class='btn btn-warning m-1' type='submit' name='addtorrent'>Добавить из файла</button>
+</div>
+</form>
+<p class='mt-2 mb-0'>Из торрента будут скачаны только файлы, подходящие по имени (например <code>f.fb2-NNN-NNN.zip</code>) и ещё отсутствующие в библиотеке. После добавления запустите &quot;Сканирование ZIP&quot;.</p>
 </div>
 </div>
 </div>
@@ -132,6 +164,7 @@ echo <<< __HTML
 <li><b>Сканирование ZIP</b> Определить заново местоположение книг в ZIP файлаx</li>
 <li><b>Скачать обложки</b> Скачать архивы обложек с Флибусты</li>
 <li><b>Скачать последние обновления</b> Скачать последние добавленные книги с Флибусты в локальный кэш. Чтобы новые книги стали доступны, запустите "Сканирование ZIP"</li>
+<li><b>Добавить книги из торрента</b> Скачать из торрента (magnet-ссылка или torrent-файл) книжные ZIP-архивы, подходящие по имени и отсутствующие в библиотеке. Чтобы новые книги стали доступны, запустите "Сканирование ZIP"</li>
 </ul>
 <p>
 Иногда проходит несколько секунд до обновления страницы после нажатия кнопки операции. Это нормально, подождите немного.
@@ -174,6 +207,49 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $service_name !== false) {
 			break;
 		case 'getdaily':
 			shell_exec('stdbuf -o0 /tools/update_daily.sh  > '. ADMINOPSTATUSFILE.' &');
+			break;
+		case 'addmagnet':
+			$magnet = trim((string)($_POST['magnet'] ?? ''));
+			if ($magnet === '' || stripos($magnet, 'magnet:?') !== 0) {
+				file_put_contents(ADMINOPSTATUSFILE, 'Некорректная magnet-ссылка');
+				break;
+			}
+			$tmpDir = CACHE_PATH.'tmp/torrent_'.bin2hex(random_bytes(8));
+			if (!mkdir($tmpDir, 0770) && !is_dir($tmpDir)) {
+				file_put_contents(ADMINOPSTATUSFILE, 'Не удалось создать временный каталог');
+				break;
+			}
+			shell_exec('stdbuf -o0 /tools/add_torrent_books.sh '.escapeshellarg($tmpDir).' '.escapeshellarg($magnet).' > '.ADMINOPSTATUSFILE.' &');
+			break;
+		case 'addtorrent':
+			if (!isset($_FILES['torrentfile']) || !is_array($_FILES['torrentfile'])) {
+				file_put_contents(ADMINOPSTATUSFILE, 'Torrent-файл не был передан');
+				break;
+			}
+			$upErr = $_FILES['torrentfile']['error'];
+			if ($upErr !== UPLOAD_ERR_OK) {
+				$msg = ($upErr === UPLOAD_ERR_INI_SIZE || $upErr === UPLOAD_ERR_FORM_SIZE)
+					? 'Torrent-файл слишком велик'
+					: 'Ошибка загрузки torrent-файла (код '.((int)$upErr).')';
+				file_put_contents(ADMINOPSTATUSFILE, $msg);
+				break;
+			}
+			if (!is_uploaded_file($_FILES['torrentfile']['tmp_name'])) {
+				file_put_contents(ADMINOPSTATUSFILE, 'Некорректная загрузка torrent-файла');
+				break;
+			}
+			$tmpDir = CACHE_PATH.'tmp/torrent_'.bin2hex(random_bytes(8));
+			if (!mkdir($tmpDir, 0770) && !is_dir($tmpDir)) {
+				file_put_contents(ADMINOPSTATUSFILE, 'Не удалось создать временный каталог');
+				break;
+			}
+			$torrentPath = $tmpDir.'/source.torrent';
+			if (!move_uploaded_file($_FILES['torrentfile']['tmp_name'], $torrentPath)) {
+				file_put_contents(ADMINOPSTATUSFILE, 'Не удалось сохранить torrent-файл');
+				@rmdir($tmpDir);
+				break;
+			}
+			shell_exec('stdbuf -o0 /tools/add_torrent_books.sh '.escapeshellarg($tmpDir).' '.escapeshellarg($torrentPath).' > '.ADMINOPSTATUSFILE.' &');
 			break;
 	}
 }
