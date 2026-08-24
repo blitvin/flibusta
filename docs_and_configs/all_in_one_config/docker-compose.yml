@@ -47,7 +47,7 @@ services:
             - MAX_FB2_SIZE_2_DISPLAY=100000000
             - FLIBUSTA_APP_ADMIN=flibustadmin
             - FLIBUSTA_APP_ADMIN_PASSWORD_FILE=/run/secrets/FLIBUSTA_APP_ADMIN_PWD
-            - FLIBUSTA_TURSTED_NET='192.168.1.0/24'
+            - FLIBUSTA_TRUSTED_NET='192.168.1.0/24'
             # M1: admin over plaintext HTTP is insecure. Leave disabled in production.
             # Uncomment ONLY for local development behind a trusted network:
             # - FLIBUSTA_ALLOW_ADMIN_ACCESS_BY_HTTP=true

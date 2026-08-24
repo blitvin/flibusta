@@ -16,7 +16,7 @@ services:
            - MAX_FB2_SIZE_2_DISPLAY=100000000
            - FLIBUSTA_APP_ADMIN=flibustadmin
            - FLIBUSTA_APP_ADMIN_PASSWORD_FILE=/run/secrets/FLIBUSTA_APP_ADMIN_PWD
-           - FLIBUSTA_TURSTED_NET='{адрес локальной сети в которой вы разрешаете пользоваться библиотекой без пароля , например 192.168.1.0/24}'
+           - FLIBUSTA_TRUSTED_NET='{адрес локальной сети в которой вы разрешаете пользоваться библиотекой без пароля , например 192.168.1.0/24}'
            - FLIBUSTA_URL=https://flibusta.is
            - FLIBUSTA_ENABLE_MISSING_BOOK_DOWNLOAD=true
         networks:

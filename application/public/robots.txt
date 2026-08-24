@@ -1,0 +1,3 @@
+# Private self-hosted library — disallow all crawling and indexing.
+User-agent: *
+Disallow: /

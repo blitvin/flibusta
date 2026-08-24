@@ -1,4 +1,10 @@
 <?php
+// Private self-hosted library: keep every response out of search indexes.
+// Complements public/robots.txt and covers all dynamic responses regardless of
+// which web server fronts php-fpm (in the external_services config nginx is external).
+if (!headers_sent()) {
+	header('X-Robots-Tag: noindex, nofollow');
+}
 define('ROOT_PATH', '/application/');
 define('CACHE_PATH', '/cache/');
 define('SQL_PATH', '/sql/');
@@ -25,9 +31,9 @@ if (is_numeric($strFb2size) && (((int)$strFb2size) > 1000000)) {
     define('MAX_FB2_SIZE_2_DISPLAY', 100000000);
 }
 
-$_trustedNet = getenv("FLIBUSTA_TURSTED_NET") ?: "";
+$_trustedNet = getenv("FLIBUSTA_TRUSTED_NET") ?: "";
 if ($_trustedNet !== '' && !isValidIpOrSubnet($_trustedNet)) {
-    error_log("Flibusta: FLIBUSTA_TURSTED_NET value '$_trustedNet' is not a valid IPv4 address or CIDR subnet — ignoring.");
+    error_log("Flibusta: FLIBUSTA_TRUSTED_NET value '$_trustedNet' is not a valid IPv4 address or CIDR subnet — ignoring.");
     $_trustedNet = "";
 }
 define('TRUSTED_NET', $_trustedNet);
