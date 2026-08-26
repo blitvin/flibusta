@@ -79,6 +79,7 @@ $c4 = '';
 $c5 = '';
 $c6 = '';
 $c7 = '';
+$c8 = '';
 $s8 = '';
 $s9 = '';
 
@@ -103,6 +104,9 @@ switch ($url->mod) {
 		break;
 	case 'users':
 		$c7 = 'active';
+		break;
+	case 'addbook':
+		$c8 = 'active';
 		break;
 	case 'help':
 		$s8 = 'active';
@@ -140,6 +144,7 @@ if (isset($_SESSION['is_admin']) && $_SESSION['is_admin']) {
 echo  <<< __HTML
 			<li class="nav-item $c6"><a title="" class="nav-link" href="$webroot/service/">Сервис</a></li>
 			<li class="nav-item $c7"><a title="" class="nav-link" href="$webroot/users/">Пользователи</a></li>
+			<li class="nav-item $c8"><a title="" class="nav-link" href="$webroot/addbook/">Добавить книгу</a></li>
 __HTML;
 }
 if (isset($_SESSION['user_id']) && $_SESSION['user_id']) {

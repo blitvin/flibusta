@@ -1547,3 +1547,58 @@ ALTER TABLE ONLY public.progress
     ADD CONSTRAINT progress_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
 
 
+
+--
+-- Locally added books (addbook module). Durable across dump imports;
+-- replayed into lib* tables by tools/merge_local_books.php.
+--
+
+CREATE SEQUENCE public.local_book_id_seq START WITH 10000000;
+CREATE SEQUENCE public.local_author_id_seq START WITH 10000000;
+
+CREATE TABLE public.local_books (
+    bookid   BIGINT PRIMARY KEY,
+    title    VARCHAR(254) NOT NULL,
+    lang     CHAR(3) NOT NULL DEFAULT 'ru',
+    year     SMALLINT NOT NULL DEFAULT 0,
+    filetype CHAR(4) NOT NULL,
+    filesize BIGINT NOT NULL DEFAULT 0,
+    md5      BYTEA NOT NULL,
+    added_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+ALTER TABLE public.local_books OWNER TO :FLIBUSTA_DBUSER;
+
+CREATE TABLE public.local_authors (
+    avtorid    BIGINT PRIMARY KEY,
+    lastname   VARCHAR(99) NOT NULL DEFAULT '',
+    firstname  VARCHAR(99) NOT NULL DEFAULT '',
+    middlename VARCHAR(99) NOT NULL DEFAULT '',
+    nickname   VARCHAR(33) NOT NULL DEFAULT '',
+    added_at   TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+ALTER TABLE public.local_authors OWNER TO :FLIBUSTA_DBUSER;
+
+CREATE TABLE public.local_book_authors (
+    bookid  BIGINT NOT NULL REFERENCES public.local_books(bookid) ON DELETE CASCADE,
+    avtorid BIGINT NOT NULL,
+    pos     SMALLINT NOT NULL DEFAULT 0,
+    PRIMARY KEY (bookid, avtorid)
+);
+
+ALTER TABLE public.local_book_authors OWNER TO :FLIBUSTA_DBUSER;
+
+CREATE TABLE public.local_book_genres (
+    bookid  BIGINT NOT NULL REFERENCES public.local_books(bookid) ON DELETE CASCADE,
+    genreid BIGINT NOT NULL,
+    PRIMARY KEY (bookid, genreid)
+);
+
+ALTER TABLE public.local_book_genres OWNER TO :FLIBUSTA_DBUSER;
+
+CREATE INDEX idx_libavtorname_trgm ON public.libavtorname
+    USING gin ((lastname || ' ' || firstname || ' ' || middlename || ' ' || nickname) gin_trgm_ops);
+
+CREATE INDEX idx_libbook_title_trgm ON public.libbook
+    USING gin (title gin_trgm_ops);

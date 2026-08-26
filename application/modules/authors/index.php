@@ -105,8 +105,13 @@ if (isset($_SESSION['authors_q'])) {
 	$stmt->bindParam(':q3', $q);
 	$stmt->execute();
 } else {
+	// Bookless authors stay in the DB (kept as candidates for the addbook
+	// module) but must not show up in regular browsing.
+	$hasBooks = "EXISTS (SELECT 1 FROM libavtor la JOIN libbook lb ON lb.bookid=la.bookid
+		WHERE la.avtorid=libavtorname.avtorid AND lb.deleted='0')";
+
 	$cntStmt = $dbh->prepare("SELECT COUNT(*) cnt FROM libavtorname
-		WHERE lower(libavtorname.lastname) LIKE :letter");
+		WHERE lower(libavtorname.lastname) LIKE :letter AND $hasBooks");
 	$cntStmt->bindParam(":letter", $letter);
 	$cntStmt->execute();
 	$cnt = $cntStmt->fetch()->cnt;
@@ -115,7 +120,7 @@ if (isset($_SESSION['authors_q'])) {
 			(SELECT COUNT(*) FROM libavtor WHERE libavtor.avtorid=libavtorname.avtorid) cnt
 			FROM libavtorname
 			LEFT JOIN libapics USING(AvtorId)
-			WHERE LOWER(libavtorname.lastname) LIKE :letter
+			WHERE LOWER(libavtorname.lastname) LIKE :letter AND $hasBooks
 			ORDER BY lastname, firstname LIMIT " . AUTHORS_PAGE . " OFFSET $start");
 	$stmt->bindParam(":letter", $letter);
 	$stmt->execute();

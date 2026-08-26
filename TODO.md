@@ -15,7 +15,7 @@ Features
 1. ~~Add new module OPDS for help with setting up feed in OPDS readers~~
 2. ~~User management and authentication , access control to the library~~
 3. ~~github action for automatic dockerhub publication when main branch is updated~~
-4. Module for adding new books to the library ( including correct work after DB recreation)
+4. ~~Module for adding new books to the library ( including correct work after DB recreation)~~
 5. Incremental updates of DB from import files
 6. Clean up and update documentation, reference to dockerhub images repository for the project, service section
 7. ~~Fallback to retreiving required book from flibusta~~

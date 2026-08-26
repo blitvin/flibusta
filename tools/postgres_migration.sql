@@ -121,3 +121,56 @@ ALTER TABLE IF EXISTS public.user_settings ADD COLUMN IF NOT EXISTS author_defau
 
 -- Add book_view_mode preference to user_settings
 ALTER TABLE IF EXISTS public.user_settings ADD COLUMN IF NOT EXISTS book_view_mode VARCHAR(15) NOT NULL DEFAULT 'contentonly';
+
+-- ============================================================================
+-- Migration: locally added books (addbook module)
+-- local_* tables are the durable source of truth for books added by the admin;
+-- the lib* tables are TRUNCATEd+reloaded on every dump import, after which
+-- tools/merge_local_books.php replays local_* rows back into them.
+-- Ids come from sequences starting at 10000000 so they can never collide with
+-- Flibusta dump ids (~900k as of 2026).
+-- ============================================================================
+
+CREATE SEQUENCE IF NOT EXISTS public.local_book_id_seq START WITH 10000000;
+CREATE SEQUENCE IF NOT EXISTS public.local_author_id_seq START WITH 10000000;
+
+CREATE TABLE IF NOT EXISTS public.local_books (
+    bookid   BIGINT PRIMARY KEY,
+    title    VARCHAR(254) NOT NULL,
+    lang     CHAR(3) NOT NULL DEFAULT 'ru',
+    year     SMALLINT NOT NULL DEFAULT 0,
+    filetype CHAR(4) NOT NULL,
+    filesize BIGINT NOT NULL DEFAULT 0,
+    md5      BYTEA NOT NULL,
+    added_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS public.local_authors (
+    avtorid    BIGINT PRIMARY KEY,
+    lastname   VARCHAR(99) NOT NULL DEFAULT '',
+    firstname  VARCHAR(99) NOT NULL DEFAULT '',
+    middlename VARCHAR(99) NOT NULL DEFAULT '',
+    nickname   VARCHAR(33) NOT NULL DEFAULT '',
+    added_at   TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- avtorid may reference either a dump author (libavtorname) or a local one
+CREATE TABLE IF NOT EXISTS public.local_book_authors (
+    bookid  BIGINT NOT NULL REFERENCES public.local_books(bookid) ON DELETE CASCADE,
+    avtorid BIGINT NOT NULL,
+    pos     SMALLINT NOT NULL DEFAULT 0,
+    PRIMARY KEY (bookid, avtorid)
+);
+
+CREATE TABLE IF NOT EXISTS public.local_book_genres (
+    bookid  BIGINT NOT NULL REFERENCES public.local_books(bookid) ON DELETE CASCADE,
+    genreid BIGINT NOT NULL,
+    PRIMARY KEY (bookid, genreid)
+);
+
+-- Trigram indexes for misspell-tolerant author/title search in the addbook
+-- module. Survive the TRUNCATE+reload import cycle (indexes are kept on TRUNCATE).
+CREATE INDEX IF NOT EXISTS idx_libavtorname_trgm ON public.libavtorname
+    USING gin ((lastname || ' ' || firstname || ' ' || middlename || ' ' || nickname) gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS idx_libbook_title_trgm ON public.libbook
+    USING gin (title gin_trgm_ops);

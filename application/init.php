@@ -14,6 +14,13 @@ define('DBUPDATE_LOCK','/cache/locks/dbupdate.lock');
 define('ADMINOPLOCKFILE','/cache/locks/adminop.lock');
 define('ADMINOPSTATUSFILE','/cache/status');
 define('TIMESTAPS_PATH','/cache/timestamps/');
+// First id assigned to locally added books/authors (addbook module). Flibusta
+// dump ids are far below this, so `id >= LOCAL_ID_BASE` identifies local
+// records and `id < LOCAL_ID_BASE` restricts a query to dump content.
+// Must stay in sync with local_book_id_seq / local_author_id_seq (see
+// tools/postgres_init.sql) and with the guarded define in
+// tools/merge_local_books.php, which runs standalone under the CLI.
+define('LOCAL_ID_BASE', 10000000);
 define('RECORDS_PAGE', 10);
 define('BOOKS_PAGE', 10);
 define('AUTHORS_PAGE', 50);

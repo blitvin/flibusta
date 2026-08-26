@@ -49,8 +49,11 @@ echo "Starting DB import" > /cache/log/dbupdate.log
 echo "Очистка HTML в аннотациях (allow-list sanitizer)"
 php /application/sanitize_annotations.php >> /cache/log/dbupdate.log 2>&1
 
-echo "Подчистка БД. Стираем авторов, серии и жанры у которых нет ни одной книги"
+echo "Подчистка БД. Стираем серии и жанры у которых нет ни одной книги"
 $SQL_CMD -f /tools/cleanup_db.sql
+
+echo "Восстановление локально добавленных книг"
+php /tools/merge_local_books.php >> /cache/log/dbupdate.log
 
 echo "Обновление полнотекстовых индексов"
 $SQL_CMD -f /tools/update_vectors.sql >> /cache/log/dbupdate.log

@@ -8,6 +8,32 @@ function h($s) {
 	return htmlspecialchars((string)($s ?? ''), ENT_QUOTES, 'UTF-8');
 }
 
+/**
+ * Format a libbook.time value as Y-m-d.
+ * Dump rows carry second precision ('2011-05-11 20:19:21+00'), but a row
+ * inserted with the column default (CURRENT_TIMESTAMP) carries microseconds,
+ * which the strict format does not match. Never let an unparseable value
+ * escalate to a fatal error on a whole listing page.
+ */
+function book_date($ts) {
+	$ts = trim((string)($ts ?? ''));
+	if ($ts === '') {
+		return '';
+	}
+	$dt = DateTime::createFromFormat('Y-m-d H:i:se', $ts);
+	if ($dt === false) {
+		$dt = DateTime::createFromFormat('Y-m-d H:i:s.ue', $ts);
+	}
+	if ($dt === false) {
+		try {
+			$dt = new DateTime($ts);
+		} catch (Throwable $e) {
+			return '';
+		}
+	}
+	return $dt->format('Y-m-d');
+}
+
 // CSRF token helpers
 function generate_csrf_token() {
 	if (!isset($_SESSION['csrf_token'])) {
@@ -175,7 +201,7 @@ function book_small_pg($book, $webroot='',$full = false) {
 	echo "<a class='w-100' href='$webroot/book/view/$book->bookid'>";
 	echo "<img class='w-100 card-image rounded-top' src='$webroot/extract_cover.php?sid=$book->bookid' />";
 
-	$dt =DateTime::createFromFormat('Y-m-d H:i:se', $book->time)->format('Y-m-d');
+	$dt = book_date($book->time);
 	if (trim($book->filetype) == 'fb2') {
 		$fhref = "$webroot/fb2.php?id=$book->bookid";
 	} else {
@@ -265,7 +291,7 @@ function book_info_pg($book, $webroot = '', $full = false) {
 	echo "<div class='col-sm-2'>";
 	echo "<img class='w-100 card-image rounded cover' src='$webroot/extract_cover.php?sid=$book->bookid' />";
 
-	$dt =DateTime::createFromFormat('Y-m-d H:i:se', $book->time)->format('Y-m-d');
+	$dt = book_date($book->time);
 	if (trim($book->filetype) == 'fb2') {
 		$fhref = "$webroot/fb2.php?id=$book->bookid";
 	} else {
@@ -669,6 +695,7 @@ function allowed_route_modules() {
 		'users',
 		'service',
 		'settings',
+		'addbook',
 		'404',
 	);
 }
@@ -962,7 +989,7 @@ function checkOPDSLogin($pdo) {
 }
 
 function isAdminPath($url) {
-	return ($url !== null &&  ($url->mod === 'service' || $url->mod === 'users'));
+	return ($url !== null &&  ($url->mod === 'service' || $url->mod === 'users' || $url->mod === 'addbook'));
 }
 
 function login($pdo, $username, $password, $webroot,$set_remember_me) {
