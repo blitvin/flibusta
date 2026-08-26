@@ -93,7 +93,7 @@ All page requests are rewritten by the web server to `application/public/index.p
   - `index.php` — rendering
   - `module_menu.php` — optional module menu
   Current modules: `primary, book, author, authors, series, genres, fav, favlist,
-  help, opds, users, service, settings, 404`.
+  help, opds, users, service, settings, addbook, 404`.
 - **Admin / service operations** (`service` module) follow a shared pattern:
   a CSRF-protected POST is validated in `service/module.conf`, then `service/index.php`
   launches a `tools/*.sh` script in the background
@@ -101,6 +101,17 @@ All page requests are rewritten by the web server to `application/public/index.p
   `flock` over `ADMINOPLOCKFILE`; the UI polls `ADMINOPSTATUSFILE` for progress.
 - **Sessions** are stored in Postgres via `application/PostgresSessionHandler.php`;
   clients on the trusted network get long-lived sessions.
+- **Locally added books** (`addbook` module, admin-only): stored durably in
+  `local_*` tables with ids from sequences starting at 10000000 (dump ids never
+  reach that); also dual-written into the `lib*` tables so they are live
+  immediately. The book file is packaged as a one-book zip
+  (`/cache/local/f.fb2.<id>-<id>.zip` or `f.usr-<id>-<id>.zip`, inner entry
+  `<id>.<ext>`) so the normal `book_zip` range lookup and `update_zip_list.php`
+  handle it unchanged. After each dump import (which TRUNCATEs the `lib*`
+  tables), `tools/merge_local_books.php` replays the `local_*` rows back,
+  applying `FLIBUSTA_LOCAL_DUPLICATE_POLICY`. Bookless authors are kept in the
+  DB as candidate authors for this module; regular search/browse/OPDS filter
+  them out at query level.
 
 ## Runtime layout (Docker volumes) & key constants
 
@@ -139,6 +150,8 @@ Defined in `application/init.php`:
   still require auth).
 - `FLIBUSTA_ALLOW_ADMIN_ACCESS_BY_HTTP` — allow admin access over plain HTTP
 - `FLIBUSTA_ENABLE_MISSING_BOOK_DOWNLOAD` — enable on-the-fly download of missing books
+- `FLIBUSTA_LOCAL_DUPLICATE_POLICY` — `keep_both` (default) or `prefer_dump`: what to
+  do when a locally added book also appears in a newly imported dump
 - `MAX_FB2_SIZE_2_DISPLAY` — max fb2 size rendered in-browser
 - `FLIBUSTA_DBHOST` / `FLIBUSTA_DBNAME` / `FLIBUSTA_DBUSER` / `FLIBUSTA_DBTYPE` and
   `FLIBUSTA_DBPASSWORD` (or `FLIBUSTA_DBPASSWORD_FILE`) — database connection

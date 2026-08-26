@@ -22,10 +22,15 @@ echo <<< _XML
 
 _XML;
 
+// Bookless authors are kept in the DB (candidates for the addbook module)
+// but must not appear in OPDS feeds.
+$hasBooks = "EXISTS (SELECT 1 FROM libavtor la2 JOIN libbook lb2 ON lb2.bookid=la2.bookid
+    WHERE la2.avtorid=%s.avtorid AND lb2.deleted='0')";
+
 // Total authors whose lastname starts with the given prefix (case-insensitive)
 $cntStmt = $dbh->prepare("SELECT COUNT(*) cnt
     FROM libavtorname
-    WHERE LOWER(lastname) LIKE :pattern");
+    WHERE LOWER(lastname) LIKE :pattern AND " . sprintf($hasBooks, 'libavtorname'));
 $cntStmt->bindValue(':pattern', $like_pattern);
 $cntStmt->execute();
 $total = (int)$cntStmt->fetchObject()->cnt;
@@ -52,7 +57,7 @@ if ($total <= OPDS_AUTHORS_COUNT) {
             (SELECT COUNT(*) FROM libavtor la JOIN libbook lb ON lb.bookid=la.bookid
              WHERE lb.deleted='0' AND la.avtorid=an.avtorid) book_cnt
         FROM libavtorname an
-        WHERE LOWER(an.lastname) LIKE :pattern
+        WHERE LOWER(an.lastname) LIKE :pattern AND " . sprintf($hasBooks, 'an') . "
         ORDER BY book_cnt DESC, an.lastname, an.firstname");
     $stmt->bindValue(':pattern', $like_pattern);
     $stmt->execute();
@@ -70,6 +75,7 @@ if ($total <= OPDS_AUTHORS_COUNT) {
             FROM libavtorname
             WHERE LOWER(lastname) LIKE :pattern
               AND CHAR_LENGTH(lastname) > :plen
+              AND " . sprintf($hasBooks, 'libavtorname') . "
         ) sub
         GROUP BY next_char
         ORDER BY next_char");
@@ -98,7 +104,7 @@ if ($total <= OPDS_AUTHORS_COUNT) {
                 (SELECT COUNT(*) FROM libavtor la JOIN libbook lb ON lb.bookid=la.bookid
                  WHERE lb.deleted='0' AND la.avtorid=an.avtorid) book_cnt
             FROM libavtorname an
-            WHERE LOWER(an.lastname) = :exact
+            WHERE LOWER(an.lastname) = :exact AND " . sprintf($hasBooks, 'an') . "
             ORDER BY book_cnt DESC, an.firstname");
         $exactStmt->bindValue(':exact', $letters_lc);
         $exactStmt->execute();

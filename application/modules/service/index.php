@@ -73,14 +73,20 @@ elseif ($command_running) {
 __HTML;
 	$cache_size = get_ds(CACHE_PATH."covers") + get_ds(CACHE_PATH."authors");
 	$books_size = round(get_ds(LIBRARY_PATH) / 1024, 1);
-	$qtotal = $dbh->query("SELECT (SELECT MAX(time) FROM libbook) mmod, 
+	// "Актуальность базы" is the freshness of the Flibusta dump, so locally
+	// added books (bookid >= LOCAL_ID_BASE, time = upload moment) must be
+	// excluded — they are always the newest rows and would otherwise always
+	// win the MAX. The book counts below deliberately DO include them: local
+	// books are genuinely part of the library.
+	$qtotal = $dbh->query("SELECT (SELECT MAX(time) FROM libbook WHERE bookid < " . LOCAL_ID_BASE . ") mmod,
 	(SELECT COUNT(*) FROM libbook) bcnt, (SELECT COUNT(*) FROM libbook WHERE deleted='0') bdcnt");
 	$qtotal->execute();
 	$total = $qtotal->fetch();
 
 	
 	echo "<table class='table'><tbody>";
-	echo "<tr><td>Актуальность базы:</td><td>$total->mmod</td></tr>";
+	$mmod = ($total->mmod === null || $total->mmod === '') ? 'нет данных' : $total->mmod;
+	echo "<tr><td>Актуальность базы:</td><td>" . h($mmod) . "</td></tr>";
 	echo "<tr><td>Всего произведений:</td><td>$total->bcnt</td></tr>";
 	echo "<tr><td>Размер архива:</td><td>$books_size Gb</td></tr>";
 	echo "<tr><td>Размер кэша:</td><td>$cache_size Mb</td></tr>";
