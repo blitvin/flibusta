@@ -1,18 +1,8 @@
 <?php
 $current_user_id = isset($_SESSION['user_id']) ? intval($_SESSION['user_id']) : 0;
-$savedCfi = '';
-$saveEpubUrl = '';
-if ($current_user_id > 0) {
-	$saveEpubUrl = $webroot . '/save_epub_position.php';
-	$saveCsrf    = get_csrf_token();
-	$stmt = $dbh->prepare("SELECT cfi FROM epub_progress WHERE user_id=:uid AND bookid=:id LIMIT 1");
-	$stmt->bindParam(":uid", $current_user_id);
-	$stmt->bindParam(":id", $url->var1);
-	$stmt->execute();
-	if ($ep = $stmt->fetch()) {
-		$savedCfi = $ep->cfi;
-	}
-}
+$bookid = (int)$url->var1;
+$posKind = 'epub';
+include(ROOT_PATH . 'modules/book/position_js.php');
 echo "<script src='$webroot/js/jszip.min.js'></script>";
 echo "<script src='$webroot/js/epub.min.js'></script>";
 ?>
@@ -35,24 +25,16 @@ r.themes.default({
 	}
 });
 
-<?php if ($current_user_id > 0): ?>
-var saveEpubUrl = <?= json_encode($saveEpubUrl, JSON_UNESCAPED_SLASHES) ?>;
-var epubBookId = <?= (int)$url->var1 ?>;
-var epubCsrf = <?= json_encode($saveCsrf) ?>;
-var saveCfiTimeout;
-
 r.on("locationChanged", function(location) {
 	if (!location || !location.start) return;
-	var cfi = location.start.cfi || location.start;
-	clearTimeout(saveCfiTimeout);
-	saveCfiTimeout = setTimeout(function() {
-		var xhr = new XMLHttpRequest();
-		xhr.open("POST", saveEpubUrl, true);
-		xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
-		xhr.send("bookid=" + encodeURIComponent(epubBookId) + "&cfi=" + encodeURIComponent(cfi) + "&csrf_token=" + encodeURIComponent(epubCsrf));
-	}, 500);
+	flibPosition.save(location.start.cfi || location.start, 500);
 });
-<?php endif; ?>
 
-var displayed = r.display(<?= $savedCfi ? json_encode($savedCfi) : 'undefined' ?>);
+// Render from the saved CFI when there is one, otherwise from the beginning.
+// The position is fetched rather than embedded so this page stays identical for
+// every reader and can be served from cache.
+var displayed;
+flibPosition.load(function (cfi) {
+	displayed = cfi ? r.display(cfi) : r.display();
+});
 </script>

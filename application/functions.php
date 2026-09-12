@@ -195,7 +195,6 @@ function book_small_pg($book, $webroot='',$full = false) {
 	if (!isset($book->bookid)) {
 		return;
 	}
-	$current_user_id = isset($_SESSION['user_id']) ? intval($_SESSION['user_id']) : 0;
 	echo "<div class='col-sm-2 col-6 mb-3'>";
 	echo "<div style='height: 100%' class='cover rounded text-center d-flex align-items-end flex-column'>";
 	echo "<a class='w-100' href='$webroot/book/view/$book->bookid'>";
@@ -214,20 +213,6 @@ function book_small_pg($book, $webroot='',$full = false) {
 		$year = $dt;
 	}
 
-	$show_fav_button = false;
-	$fav = 'btn-outline-secondary';
-	$fav_action = 'fav_book';
-	if ($current_user_id > 0) {
-		$show_fav_button = true;
-		$stmt = $dbh->prepare("SELECT COUNT(*) cnt FROM fav WHERE user_id=:uid AND bookid=:id");
-		$stmt->bindParam(":uid", $current_user_id);
-		$stmt->bindParam(":id", $book->bookid);
-		$stmt->execute();
-		if ($stmt->fetch()->cnt > 0) {
-			$fav = 'btn-primary';
-			$fav_action = 'unfav_book';
-		}
-	}
 
 	echo "<div>" . h($book->title) . "</div></a>";
 
@@ -263,15 +248,8 @@ function book_small_pg($book, $webroot='',$full = false) {
 	echo "<div class='btn-group w-100 mt-1' role='group'>";
 	echo "<a href='$webroot/book/view/$book->bookid/withannotation' class='btn btn-outline-info btn-sm'>О книге</a>";
 	echo "<a href='$webroot/book/view/$book->bookid/contentonly' class='btn btn-outline-primary btn-sm'>Читать</a>";
-	if ($show_fav_button) {
-		$fav_id = $book->bookid;
-		echo "<form method='POST' action='' style='display:inline;'>
-			<input type='hidden' name='action' value='$fav_action' />
-			<input type='hidden' name='id' value='$fav_id' />
-			<input type='hidden' name='csrf_token' value='" . htmlspecialchars(get_csrf_token()) . "' />
-			<button type='submit' title='В избранное' class='btn $fav btn-sm'><i class='fas fa-heart'></i></button>
-		</form>";
-	}
+	// Neutral slot; the browser draws the button for whoever is logged in.
+	echo fav_slot('book', (int)$book->bookid);
 	echo "</div>";
 	echo "</div></div>\n";
 }
@@ -281,7 +259,6 @@ function book_info_pg($book, $webroot = '', $full = false) {
 	if (!isset($book->bookid)) {
 		return;
 	}
-	$current_user_id = isset($_SESSION['user_id']) ? intval($_SESSION['user_id']) : 0;
 	echo "<div class='hic card mb-3' itemscope='' itemtype='http://schema.org/Book'>";
 //	echo "<div class='card-header'>";
 	echo "<h4 class='rounded-top' style='background: #d0d0d0;'><a class='book-link' href='$webroot/book/view/" . intval($book->bookid) . "'><i class='fas'></i> " . h($book->title) . "</h4></a>";
@@ -302,19 +279,6 @@ function book_info_pg($book, $webroot = '', $full = false) {
 		$year = $book->year;
 	} else {
 		$year = $dt;
-	}
-
-	$fav = 'btn-outline-secondary';
-	$fav_action = 'fav_book';
-	if ($current_user_id > 0) {
-		$stmt = $dbh->prepare("SELECT COUNT(*) cnt FROM fav WHERE user_id=:uid AND bookid=:id");
-		$stmt->bindParam(":uid", $current_user_id);
-		$stmt->bindParam(":id", $book->bookid);
-		$stmt->execute();
-		if ($stmt->fetch()->cnt > 0) {
-			$fav = 'btn-primary';
-			$fav_action = 'unfav_book';
-		}
 	}
 
 	// Row 1: year + download (split dropdown for fb2, plain button for others)
@@ -349,14 +313,7 @@ function book_info_pg($book, $webroot = '', $full = false) {
 	echo "<div class='btn-group w-100 mt-1' role='group'>";
 	echo "<a href='$webroot/book/view/$book->bookid/withannotation' class='btn btn-outline-info btn-sm'>О книге</a>";
 	echo "<a href='$webroot/book/view/$book->bookid/contentonly' class='btn btn-outline-primary btn-sm'>Читать</a>";
-	if ($current_user_id > 0) {
-		echo "<form method='POST' action='' style='display:inline;'>
-			<input type='hidden' name='action' value='$fav_action' />
-			<input type='hidden' name='id' value='$book->bookid' />
-			<input type='hidden' name='csrf_token' value='" . htmlspecialchars(get_csrf_token()) . "' />
-			<button type='submit' title='В избранное' class='btn $fav btn-sm'><i class='fas fa-heart'></i></button>
-		</form>";
-	}
+	echo fav_slot('book', (int)$book->bookid);
 	echo "</div>";
 
 	echo "</div><div class='col-sm-10'>";
@@ -1043,7 +1000,7 @@ function get_login_redirect($pdo, $user_id, $webroot) {
 	$base   = $webroot ?: '/';
 	$prefix = rtrim($webroot, '/');
 	try {
-		$stmt = $pdo->prepare("SELECT login_redirect, last_book FROM user_settings WHERE user_id = ?");
+		$stmt = $pdo->prepare("SELECT login_redirect FROM user_settings WHERE user_id = ?");
 		$stmt->execute([$user_id]);
 		$row = $stmt->fetch(PDO::FETCH_OBJ);
 	} catch (Exception $e) {
@@ -1060,18 +1017,203 @@ function get_login_redirect($pdo, $user_id, $webroot) {
 			return $prefix . '/fav/';
 		}
 	}
-	if ($pref === 'last_book' && $row && !empty($row->last_book) && intval($row->last_book) > 0) {
-		return $prefix . '/book/view/' . intval($row->last_book);
+	// The last opened book lives in the local positions store together with the
+	// reading position it belongs to (user_settings.last_book is dormant).
+	if ($pref === 'last_book') {
+		$lastBook = position_get_last_book(intval($user_id));
+		if ($lastBook !== null && $lastBook > 0) {
+			return $prefix . '/book/view/' . $lastBook;
+		}
 	}
 	return $base;
 }
 
+/**
+ * A user's personal hidden-genre list, as an array of ints.
+ *
+ * Never cached in $_SESSION: sessions are shared across tabs and live up to a
+ * year for trusted-network clients, so a session copy would go stale after a
+ * save on another device. The shared cache used here is different - it is keyed
+ * by the user's cache epoch, which every settings save bumps, so a change on one
+ * device is visible on all of them immediately. Postgres remains the source of
+ * truth.
+ *
+ * The (int) cast is the single point of origin that makes it safe for callers
+ * to inline these ids into an SQL IN (...) list.
+ */
+function get_excluded_genres($pdo, $user_id) {
+	static $cache = [];
+	$user_id = intval($user_id);
+	if ($user_id <= 0) {
+		return [];
+	}
+	if (isset($cache[$user_id])) {
+		return $cache[$user_id];
+	}
+	$key = 'xg:u' . $user_id . ':e' . user_cache_epoch($user_id, 'prefs');
+	$cached = flib_cache()->get($key);
+	if (is_array($cached)) {
+		$cache[$user_id] = $cached;
+		return $cached;
+	}
+	$out = [];
+	try {
+		$stmt = $pdo->prepare("SELECT genreid FROM user_excluded_genres WHERE user_id = ? ORDER BY genreid");
+		$stmt->execute([$user_id]);
+		while ($r = $stmt->fetch()) {
+			$out[] = (int)$r->genreid;
+		}
+	} catch (Exception $e) {
+		// Fail open: a broken preference must never break browsing.
+		error_log('Flibusta: excluded genres read failed: ' . $e->getMessage());
+		return [];
+	}
+	flib_cache()->set($key, $out, DATA_CACHE_TTL);
+	$cache[$user_id] = $out;
+	return $out;
+}
+
+/**
+ * The user's favourites as three plain id lists, for public/user_state.php.
+ *
+ * Favourite marks are not rendered into pages any more (pages are shared between
+ * users); the browser fetches this and marks up the neutral slots. One cached
+ * read per user rather than a query per rendered item.
+ */
+function user_fav_ids($pdo, $user_id) {
+	$user_id = intval($user_id);
+	$empty = ['books' => [], 'authors' => [], 'series' => []];
+	if ($user_id <= 0) {
+		return $empty;
+	}
+	$key = 'favids:u' . $user_id . ':e' . user_cache_epoch($user_id, 'fav');
+	$cached = flib_cache()->get($key);
+	if (is_array($cached)) {
+		return $cached;
+	}
+	$out = $empty;
+	try {
+		$stmt = $pdo->prepare("SELECT bookid, avtorid, seqid FROM fav WHERE user_id = ?");
+		$stmt->execute([$user_id]);
+		while ($r = $stmt->fetch()) {
+			if (!empty($r->bookid))  { $out['books'][]   = (int)$r->bookid; }
+			if (!empty($r->avtorid)) { $out['authors'][] = (int)$r->avtorid; }
+			if (!empty($r->seqid))   { $out['series'][]  = (int)$r->seqid; }
+		}
+	} catch (Exception $e) {
+		error_log('Flibusta: favourites read failed: ' . $e->getMessage());
+		return $empty;
+	}
+	flib_cache()->set($key, $out, DATA_CACHE_TTL);
+	return $out;
+}
+
+/**
+ * A neutral slot where a favourite button is drawn by the browser.
+ *
+ * Emitting the button server-side would bake this visitor's favourites into a
+ * page that is shared with everyone else. The slot starts empty, so anonymous
+ * visitors (who have no favourites) see nothing appear and nothing disappear.
+ * See public/js/fav.js and public/user_state.php.
+ */
+function fav_slot(string $type, int $id, string $label = ''): string {
+	$attrs = "class='flib-fav' data-fav-type='" . htmlspecialchars($type, ENT_QUOTES, 'UTF-8')
+		. "' data-fav-id='" . (int)$id . "'";
+	if ($label !== '') {
+		$attrs .= " data-fav-label='" . htmlspecialchars($label, ENT_QUOTES, 'UTF-8') . "'";
+	}
+	return "<span $attrs></span>";
+}
+
+/**
+ * A user's display preferences (login_redirect, author_default_tab,
+ * book_view_mode). Same caching contract as get_excluded_genres(): shared cache,
+ * invalidated by the user's epoch on save, DB remains source of truth.
+ *
+ * Returns an object with all three fields always present (defaults applied), so
+ * callers do not have to null-check.
+ */
+function get_user_prefs($pdo, $user_id) {
+	static $cache = [];
+	$user_id = intval($user_id);
+	$defaults = (object)['login_redirect' => 'default', 'author_default_tab' => 'alpha', 'book_view_mode' => 'contentonly'];
+	if ($user_id <= 0) {
+		return $defaults;
+	}
+	if (isset($cache[$user_id])) {
+		return $cache[$user_id];
+	}
+	$key = 'prefs:u' . $user_id . ':e' . user_cache_epoch($user_id, 'prefs');
+	$cached = flib_cache()->get($key);
+	if ($cached instanceof stdClass) {
+		$cache[$user_id] = $cached;
+		return $cached;
+	}
+	$prefs = clone $defaults;
+	try {
+		$stmt = $pdo->prepare("SELECT login_redirect, author_default_tab, book_view_mode FROM user_settings WHERE user_id = ?");
+		$stmt->execute([$user_id]);
+		if ($row = $stmt->fetch(PDO::FETCH_OBJ)) {
+			foreach (['login_redirect', 'author_default_tab', 'book_view_mode'] as $f) {
+				if (!empty($row->$f)) {
+					$prefs->$f = $row->$f;
+				}
+			}
+		}
+	} catch (Exception $e) {
+		error_log('Flibusta: user settings read failed: ' . $e->getMessage());
+		return $defaults;
+	}
+	flib_cache()->set($key, $prefs, DATA_CACHE_TTL);
+	$cache[$user_id] = $prefs;
+	return $prefs;
+}
+
+/**
+ * Book fields needed to serve a download or extract a cover, cached per book id.
+ *
+ * Lets fb2.php / usr.php / extract_cover.php answer repeat requests without
+ * touching the database at all (together with book_zip_lookup()). Only the
+ * global epoch is in the key: this data changes only on a dump import.
+ */
+function get_book_download_meta($pdo, $bookid) {
+	$bookid = intval($bookid);
+	if ($bookid <= 0) {
+		return null;
+	}
+	$key = 'bookmeta:g' . cache_global_epoch() . ':' . $bookid;
+	$cached = flib_cache()->get($key);
+	if ($cached instanceof stdClass) {
+		return $cached;
+	}
+	try {
+		// Subqueries rather than the LEFT JOIN chain the download scripts used:
+		// with several authors/genres/series that fanned out into duplicate rows
+		// of which only the first was ever used.
+		$stmt = $pdo->prepare("SELECT b.Title AS booktitle, trim(b.FileType) AS filetype,
+				(SELECT f.FileName FROM libfilename f WHERE f.BookId = b.BookId LIMIT 1) AS filename,
+				(SELECT CONCAT(an.LastName, ' ', an.FirstName)
+					FROM libavtor a JOIN libavtorname an ON an.AvtorId = a.AvtorId
+					WHERE a.BookId = b.BookId LIMIT 1) AS author_name
+			FROM libbook b WHERE b.BookId = ? LIMIT 1");
+		$stmt->execute([$bookid]);
+		$row = $stmt->fetch(PDO::FETCH_OBJ);
+	} catch (Exception $e) {
+		error_log('Flibusta: book metadata read failed: ' . $e->getMessage());
+		return null;
+	}
+	if (!$row) {
+		return null;
+	}
+	flib_cache()->set($key, $row, DATA_CACHE_TTL);
+	return $row;
+}
+
 function cleanupUserMgmtTables($pdo) {
+	// Sessions are files now (FileSessionHandler::gc handles their expiry).
 	$pdo->query("DELETE FROM login_attempts  WHERE attempt_time < NOW() - INTERVAL '30 days'");
-	$pdo->query("DELETE FROM php_sessions WHERE last_accessed < NOW() - INTERVAL '2 days'");
 	$pdo->query("DELETE FROM user_tokens WHERE expires_at < NOW()");
 	$pdo->query("VACUUM ANALYZE login_attempts");
-	$pdo->query("VACUUM ANALYZE php_sessions");
 	$pdo->query("VACUUM ANALYZE user_tokens");
 }
 

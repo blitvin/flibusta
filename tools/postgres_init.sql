@@ -1470,20 +1470,9 @@ CREATE TABLE public.users (
 );
 ALTER TABLE public.users OWNER TO :FLIBUSTA_DBUSER;
 
-CREATE TABLE public.php_sessions (
-    id            VARCHAR(128) NOT NULL PRIMARY KEY,
-    data          BYTEA NOT NULL,       -- The serialized session data
-    user_id INT REFERENCES users(id) ON DELETE CASCADE,
-    username VARCHAR(50),
-    ip_address INET,
-    user_agent TEXT,
-    last_accessed TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-
-
-ALTER TABLE public.php_sessions OWNER TO :FLIBUSTA_DBUSER;
--- Index for the garbage collector to find old sessions quickly
-CREATE INDEX idx_sessions_expiry ON public.php_sessions(last_accessed);
+-- Sessions are NOT stored in the database: they live as files on the /cache
+-- volume (application/FileSessionHandler.php), so that a request served from
+-- the page cache needs no database connection at all.
 
 CREATE TABLE public.login_attempts (
     ip_address INET NOT NULL,
@@ -1521,6 +1510,23 @@ CREATE TABLE public.user_settings (
 );
 
 ALTER TABLE public.user_settings OWNER TO :FLIBUSTA_DBUSER;
+
+--
+-- Per-user hidden genres (settings module -> "Скрытые жанры"). Books in these
+-- genres are filtered out of the main book list.
+-- Deliberately no FK to libgenrelist: that table is TRUNCATEd and reloaded on
+-- every dump import (tools/app_topg), and its primary key is the pair
+-- (genreid, genrecode), so genreid alone is not referenceable. Stale ids are
+-- harmless - they simply match no book.
+--
+
+CREATE TABLE public.user_excluded_genres (
+    user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    genreid BIGINT NOT NULL,
+    PRIMARY KEY (user_id, genreid)
+);
+
+ALTER TABLE public.user_excluded_genres OWNER TO :FLIBUSTA_DBUSER;
 
 CREATE TABLE public.epub_progress (
     user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,

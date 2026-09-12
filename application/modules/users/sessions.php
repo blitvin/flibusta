@@ -14,15 +14,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_id'])) {
         die('CSRF validation failed.');
     }
 
-    $delete_id = $_POST['delete_id'];
-    $stmt = $dbh->prepare("DELETE FROM php_sessions WHERE id = ?");
-    $stmt->execute([$delete_id]);
+    session_store_destroy((string)$_POST['delete_id']);
 }
 
 echo "<h4>Активные сессии</h4>";
 
-$stmt = $dbh->query("SELECT id, last_accessed, username, user_agent, ip_address FROM php_sessions ORDER BY last_accessed DESC");
-$sessions = $stmt->fetchAll(PDO::FETCH_OBJ);
+// Sessions live on the /cache volume, not in the database (see FileSessionHandler).
+$sessions = session_store_list();
 
 if ($sessions) {
     echo "<table class='table'><thead><tr><th>ID сессии</th><th>Последний доступ</th><th>Пользователь</th><th>User-Agent</th><th>IP входа</th><th>Действия</th></tr></thead><tbody>";

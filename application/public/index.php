@@ -1,7 +1,10 @@
 <?php
-ob_start();
-
 include("../init.php");
+// The buffer callback resolves the per-visitor placeholders (nav chrome, CSRF
+// token) that cached pages are stored with. Registering it as the buffer's own
+// callback means it runs on every exit path - cache hit, normal render, or a
+// module calling die() half way through the page.
+ob_start('flib_output_filter');
 session_start();
 decode_gurl($webroot);
 // It is important that no DB access to any table that can be modified by service module phps
@@ -63,6 +66,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $current_user_id > 0) {
 			$st->bindParam(":id", $id);
 			$st->execute();
 		}
+		// Favourite stars appear on almost every page: invalidate this user's
+		// cached pages and fragments so the page rendered by *this* request
+		// already shows the new state.
+		bump_user_cache_epoch($current_user_id, 'fav');
 	}
 }
 
@@ -103,12 +110,20 @@ switch ($sort_mode) {
 		break;
 }
 
+// Page cache is consulted only after the access check, so authentication and
+// login redirects are never bypassed. On a hit page_cache_serve() exits.
+$page_cache_key = page_cache_key($url, $current_user_id);
+
 if ($url->mod == 'opds') {
 	checkOPDSLogin($dbh);
+	page_cache_serve($page_cache_key);
 	include(ROOT_PATH . "/opds/index.php");
 } else {
 	checkLogin($dbh, isAdminPath($url),$webroot);
+	page_cache_serve($page_cache_key);
 	include(ROOT_PATH . 'modules/' . $url->mod . '/module.conf');
 	include(ROOT_PATH . "renderer.php");
 }
+
+page_cache_store($page_cache_key);
 

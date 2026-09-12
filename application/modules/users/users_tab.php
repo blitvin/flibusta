@@ -2,8 +2,7 @@
 // Пользователи (основной таб)
 
 function invalidateUserSessions($dbh, $user_id) {
-    $stmt_delete = $dbh->prepare("DELETE FROM php_sessions WHERE user_id = ?");
-    $stmt_delete->execute([$user_id]);
+    session_store_destroy_user((int)$user_id);
 }
 
 if (empty($_SESSION['csrf_token'])) {
@@ -38,7 +37,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
         // Invalidate all sessions for this user before deleting
         invalidateUserSessions($dbh, $user_id);
-        
+        // Reading positions live outside the DB, so they need explicit cleanup.
+        positions_delete_user((int)$user_id);
+
         $stmt = $dbh->prepare("DELETE FROM users WHERE id = ?");
         $stmt->execute([$user_id]);
         // Note: user_tokens are automatically deleted due to ON DELETE CASCADE constraint

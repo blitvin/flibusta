@@ -25,16 +25,26 @@ $dsn = match($dbtype) {
 */
 $dsn = "pgsql:host=".$dbhost.";dbname=".$dbname.";options='--client_encoding=UTF8'";
 
-try {
-	$dbh = new PDO($dsn, $dbuser, $dbpasswd);
-	$dbh->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-	$dbh->setAttribute(PDO::ATTR_EMULATE_PREPARES, false);
-	$dbh->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_OBJ);
-} catch(Exception $e) {
-	// L3: never leak connection details (DSN/host) to output.
-	error_log('Flibusta DB connection failed: ' . $e->getMessage());
-	http_response_code(500);
-	die('Database temporarily unavailable.');
+if (PHP_SAPI === 'cli') {
+	// CLI tools (update_zip_list.php, merge_local_books.php, sanitize_annotations.php,
+	// migrate_positions_to_files.php) query immediately and some of them type-hint
+	// PDO, so they get a real connection right away.
+	try {
+		$dbh = new PDO($dsn, $dbuser, $dbpasswd);
+		$dbh->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+		$dbh->setAttribute(PDO::ATTR_EMULATE_PREPARES, false);
+		$dbh->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_OBJ);
+	} catch(Exception $e) {
+		// L3: never leak connection details (DSN/host) to output.
+		error_log('Flibusta DB connection failed: ' . $e->getMessage());
+		http_response_code(500);
+		die('Database temporarily unavailable.');
+	}
+} else {
+	// Web requests connect on first query only: cache hits, already-extracted
+	// covers and file-resolved downloads never touch Postgres at all.
+	include_once(ROOT_PATH . 'LazyPDO.php');
+	$dbh = new LazyPDO($dsn, $dbuser, $dbpasswd);
 }
 
 ?>

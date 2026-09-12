@@ -41,6 +41,8 @@ echo <<< __HTML
 
 <link href="$webroot/css/all.min.css" rel="stylesheet">
 <link href="$webroot/css/style.css" rel="stylesheet">
+<script>window.FLIBUSTA_WEBROOT = "$webroot";</script>
+<script src="$webroot/js/fav.js"></script>
 __HTML
 ?>
 <style>
@@ -140,31 +142,17 @@ echo <<< __HTML
 			
 __HTML;
 
-if (isset($_SESSION['is_admin']) && $_SESSION['is_admin']) {
-echo  <<< __HTML
-			<li class="nav-item $c6"><a title="" class="nav-link" href="$webroot/service/">Сервис</a></li>
-			<li class="nav-item $c7"><a title="" class="nav-link" href="$webroot/users/">Пользователи</a></li>
-			<li class="nav-item $c8"><a title="" class="nav-link" href="$webroot/addbook/">Добавить книгу</a></li>
-__HTML;
-}
-if (isset($_SESSION['user_id']) && $_SESSION['user_id']) {
-echo <<< __HTML
-			<li class="nav-item $s9"><a title="" class="nav-link" href="$webroot/settings/">Настройки</a></li>
-__HTML;
-}
-$user_name_html = '';
-if (! empty($_SESSION['username'])) {
-    $user_name = htmlspecialchars($_SESSION['username'], ENT_QUOTES, 'UTF-8');
-    if (isset($_SESSION['is_admin']) && $_SESSION['is_admin']) {
-        $user_name_html = "<span class='btn btn-warning btn-sm me-2'>$user_name</span>";
-    } else {
-        $user_name_html = "<span class='btn btn-outline-info btn-sm me-2'>$user_name</span>";
-    }
-}
+// The admin/settings entries and the username badge are the only per-visitor
+// parts of a page. They are emitted as placeholders and substituted per request
+// by flib_output_filter() (see application/user_chrome.php), so the rest of the
+// page can be cached once and served to everybody.
+echo CHROME_NAV_ITEMS_PLACEHOLDER;
 echo <<< __HTML
 		</ul>
 <div class="d-flex align-items-center">
-$user_name_html
+__HTML;
+echo CHROME_USER_CHIP_PLACEHOLDER;
+echo <<< __HTML
 <a class='btn btn-outline-light btn-sm' href='$webroot/login.php'>Сменить пользователя</a>
 </div>
 </div>

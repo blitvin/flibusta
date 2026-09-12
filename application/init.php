@@ -22,6 +22,9 @@ define('TIMESTAPS_PATH','/cache/timestamps/');
 // tools/merge_local_books.php, which runs standalone under the CLI.
 define('LOCAL_ID_BASE', 10000000);
 define('RECORDS_PAGE', 10);
+// Upper bound on a user's personal hidden-genre list. Also bounds the inlined
+// IN (...) list built in modules/primary/index.php.
+define('MAX_EXCLUDED_GENRES', 100);
 define('BOOKS_PAGE', 10);
 define('AUTHORS_PAGE', 50);
 define('SERIES_PAGE', 50);
@@ -49,6 +52,26 @@ define('ADMIN_ACCESS_BY_HTTPS', getenv("FLIBUSTA_ALLOW_ADMIN_ACCESS_BY_HTTP") !=
 define('FLIBUSTA_URL', getenv('FLIBUSTA_URL') ?: 'https://flibusta.is');
 define('FLIBUSTA_MISSING_BOOK_DOWNLOAD', getenv('FLIBUSTA_ENABLE_MISSING_BOOK_DOWNLOAD') !== 'false');
 
+// Caching. 'files' (default) keeps everything on the /cache volume, 'redis' uses
+// an external redis service, 'none' disables caching entirely and restores the
+// pre-cache behaviour - the escape hatch if anything misbehaves.
+$_cacheBackend = strtolower(trim((string)(getenv('FLIBUSTA_CACHE_BACKEND') ?: 'files')));
+if (!in_array($_cacheBackend, ['none', 'files', 'redis'], true)) {
+    error_log("Flibusta: FLIBUSTA_CACHE_BACKEND value '$_cacheBackend' is not one of none|files|redis - using 'files'.");
+    $_cacheBackend = 'files';
+}
+define('CACHE_BACKEND', $_cacheBackend);
+unset($_cacheBackend);
+// TTLs are only a safety net: content changes arrive through the cache epoch
+// (DB import/reindex) and the per-user epoch (favourites/settings).
+define('PAGE_CACHE_TTL', (int)(getenv('FLIBUSTA_PAGE_CACHE_TTL') ?: 21600));
+define('DATA_CACHE_TTL', (int)(getenv('FLIBUSTA_DATA_CACHE_TTL') ?: 86400));
+include_once(ROOT_PATH . 'cache/cache.php');
+include_once(ROOT_PATH . 'pagecache.php');
+include_once(ROOT_PATH . 'user_chrome.php');
+include_once(ROOT_PATH . 'positions.php');
+include_once(ROOT_PATH . 'book_zip_store.php');
+
 $isTrustedClient = (TRUSTED_NET !== '') && ipInNetwork($_SERVER['REMOTE_ADDR'] ?? '', TRUSTED_NET);
 session_set_cookie_params([ 'lifetime' => $isTrustedClient ? 3600 * 24 * 365 : 3600 * 4,
                             'path' => $webroot != "" ? $webroot : "/",
@@ -65,8 +88,10 @@ ini_set('session.cookie_secure', '1');   // Only send cookie over HTTPS
 ini_set('session.cookie_httponly', '1'); // Prevent Javascript from stealing the cookie
 ini_set('session.use_only_cookies', '1');
 
-include_once __DIR__ . '/PostgresSessionHandler.php';
-$handler = new PostgresSessionHandler($dbh, TRUSTED_NET);
+// Sessions live on the /cache volume, not in Postgres, so session_start() costs
+// no DB round-trip and cached pages can be served without a connection.
+include_once __DIR__ . '/FileSessionHandler.php';
+$handler = new FileSessionHandler(session_store_dir(), TRUSTED_NET);
 session_set_save_handler($handler, true);
 
 

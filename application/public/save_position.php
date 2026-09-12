@@ -1,4 +1,7 @@
 <?php
+// Stores the scroll position for fb2/txt/pdf/rtf/docx/mobi/html readers.
+// Called on every scroll tick (66 ms debounce), so it deliberately touches no
+// database: the position lives in the local per-user store.
 include('../init.php');
 session_start();
 
@@ -22,17 +25,5 @@ if ($bookid <= 0) {
 	die();
 }
 
-if ($pos == 0) {
-	$stmt = $dbh->prepare("DELETE FROM progress WHERE user_id=:uid AND bookid=:id");
-	$stmt->bindParam(":uid", $user_id);
-	$stmt->bindParam(":id", $bookid);
-	$stmt->execute();
-	die();
-}
-
-$stmt = $dbh->prepare("INSERT INTO progress (user_id, bookid, pos) VALUES (:uid, :id, :pos) ON CONFLICT(user_id, bookid) DO UPDATE set pos=:pos2");
-$stmt->bindParam(":uid", $user_id);
-$stmt->bindParam(":id", $bookid);
-$stmt->bindParam(":pos", $pos);
-$stmt->bindParam(":pos2", $pos);
-$stmt->execute();
+// Position 0 means "back at the top" - drop the entry rather than store it.
+position_set($user_id, 'pos', $bookid, $pos == 0 ? null : $pos);

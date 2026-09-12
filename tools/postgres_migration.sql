@@ -7,18 +7,11 @@ CREATE TABLE IF NOT EXISTS users (
 );
 
 
-CREATE TABLE IF NOT EXISTS php_sessions (
-    id            VARCHAR(128) NOT NULL PRIMARY KEY,
-    data          BYTEA NOT NULL,
-    user_id INT REFERENCES users(id) ON DELETE CASCADE,
-    username VARCHAR(50),
-    ip_address INET,
-    user_agent TEXT,
-    last_accessed TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE INDEX IF NOT EXISTS idx_sessions_last_accessed 
-ON php_sessions (last_accessed);
+-- Sessions moved to files on the /cache volume (application/FileSessionHandler.php).
+-- Keeping them in Postgres forced a SELECT + UPSERT - and therefore a database
+-- connection - on every single request, which defeated page caching entirely.
+-- Existing rows are not migrated: users simply log in again.
+DROP TABLE IF EXISTS php_sessions;
 
 
 
@@ -110,9 +103,6 @@ CREATE TABLE IF NOT EXISTS djvu_progress (
 -- Add last_book column to user_settings for "return to last opened book" redirect option
 ALTER TABLE IF EXISTS public.user_settings ADD COLUMN IF NOT EXISTS last_book INT;
 
--- Allow anonymous (not-logged-in) sessions: user_id must be nullable
-ALTER TABLE IF EXISTS public.php_sessions ALTER COLUMN user_id DROP NOT NULL;
-
 -- Drop legacy seqname table (was empty; replaced by libseqname_ts for FTS)
 DROP TABLE IF EXISTS public.seqname CASCADE;
 
@@ -174,3 +164,18 @@ CREATE INDEX IF NOT EXISTS idx_libavtorname_trgm ON public.libavtorname
     USING gin ((lastname || ' ' || firstname || ' ' || middlename || ' ' || nickname) gin_trgm_ops);
 CREATE INDEX IF NOT EXISTS idx_libbook_title_trgm ON public.libbook
     USING gin (title gin_trgm_ops);
+
+-- ============================================================================
+-- Migration: per-user hidden genres (settings module -> "Скрытые жанры")
+-- Books in these genres are filtered out of the main book list.
+-- Deliberately no FK to libgenrelist: that table is TRUNCATEd and reloaded on
+-- every dump import, and its primary key is the pair (genreid, genrecode), so
+-- genreid alone is not referenceable. Stale ids are harmless - they simply
+-- match no book, and the genre may come back in a later dump.
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS public.user_excluded_genres (
+    user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    genreid BIGINT NOT NULL,
+    PRIMARY KEY (user_id, genreid)
+);

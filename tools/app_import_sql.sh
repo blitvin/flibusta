@@ -61,6 +61,11 @@ $SQL_CMD -f /tools/update_vectors.sql >> /cache/log/dbupdate.log
 echo "Создание индекса zip-файлов"
 php /tools/update_zip_list.php  >> /cache/log/dbupdate.log
 date > /cache/timestamps/app_reindex
+# Library content changed: invalidate every cached page and fragment. The epoch
+# is part of every cache key, so this works for the file and redis backends
+# alike without needing a client for either.
+date > /cache/timestamps/cache_epoch
+rm -rf /cache/pagecache/* /cache/appcache/*
 echo "Процесс обновления БД завершен"
 echo "app_import_sql.sh : finished" >&2 
 exec 200>&-

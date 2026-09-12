@@ -53,6 +53,9 @@ services:
             # - FLIBUSTA_ALLOW_ADMIN_ACCESS_BY_HTTP=true
             - FLIBUSTA_URL=https://flibusta.is
             - FLIBUSTA_ENABLE_MISSING_BOOK_DOWNLOAD=true
+            # Кэширование: files (по умолчанию, кэш в /cache), none (отключить),
+            # redis (внешний сервис, см. FLIBUSTA_REDIS_* в документации).
+            - FLIBUSTA_CACHE_BACKEND=files
         secrets:
             - FLIBUSTA_PWD
             - FLIBUSTA_APP_ADMIN_PWD

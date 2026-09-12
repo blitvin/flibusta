@@ -1,6 +1,7 @@
 <?php
 error_reporting(E_ALL);
 include('/application/dbinit.php');
+include_once('/application/book_zip_store.php');
 
 define('MAIN_LIBRARY_DIR','/flibusta/');
 define('LOCAL_FILES_DIR','/cache/local/');
@@ -154,6 +155,11 @@ $stmt->execute();
 
 $dbh->beginTransaction();
 
+// Collected alongside the INSERTs and written to /cache/book_zip.php below, so
+// the runtime lookup needs no database (see application/book_zip_store.php).
+$fb2Rows = [];
+$usrRows = [];
+
 foreach($filteredFb2 as $bookFile ) {
     $stmt = $dbh->prepare("INSERT INTO book_zip (filename, start_id, end_id, usr) VALUES (:fn, :start, :end, :usr)");
     $filepath = ($bookFile->local)? LOCAL_FILES_DIR.$bookFile->path : MAIN_LIBRARY_DIR.$bookFile->path;
@@ -162,6 +168,7 @@ foreach($filteredFb2 as $bookFile ) {
 	$stmt->bindParam(":end", $bookFile->endId);
 	$stmt->bindValue(":usr", 0);
 	$stmt->execute();
+	$fb2Rows[] = [(int)$bookFile->startId, (int)$bookFile->endId, $filepath];
 }
 
 
@@ -173,6 +180,10 @@ foreach($filteredUsr as $bookFile ) {
 	$stmt->bindParam(":end", $bookFile->endId);
 	$stmt->bindValue(":usr", 1);
 	$stmt->execute();
+	$usrRows[] = [(int)$bookFile->startId, (int)$bookFile->endId, $filepath];
 }
 
 $dbh->commit();
+
+book_zip_file_write($fb2Rows, $usrRows);
+fwrite(STDERR, "book_zip file written: ".count($fb2Rows)." fb2, ".count($usrRows)." usr archives".PHP_EOL);

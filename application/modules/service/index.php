@@ -197,6 +197,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $service_name !== false) {
 			shell_exec('rm -f /cache/authors/*');
 			shell_exec('rm -f /cache/covers/*');
 			shell_exec('rm -f /cache/log/*');
+			// Cached pages and fragments too, whatever backend is configured.
+			cache_clear_all();
 			file_put_contents(ADMINOPSTATUSFILE, 'Очистка cache выполнена');
 			break;
 		case 'getcovers':
