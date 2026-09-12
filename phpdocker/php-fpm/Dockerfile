@@ -39,9 +39,7 @@ RUN find /public_files -name "*.php" -exec sh -c '> "{}"' \;
 RUN find /public_files -type f -regex ".*\.\(js\|css\|svg\|xml\)" -exec gzip -k -9 {} + \
     && find /public_files -type f -regex ".*\.\(js\|css\|svg\|xml\)" -exec brotli -k -Z {} +
 
-# redis is only used when FLIBUSTA_CACHE_BACKEND=redis; the default file cache
-# needs no extension. Built unconditionally so switching backends needs no rebuild.
-RUN chmod +x /usr/local/bin/install-php-extensions; install-php-extensions gd bz2 pdo_pgsql zip redis
+RUN chmod +x /usr/local/bin/install-php-extensions; install-php-extensions gd bz2 pdo_pgsql zip
 
 COPY --from=fb2cng-downloader /usr/local/bin/fbc /usr/local/bin/fbc
 

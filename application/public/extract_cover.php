@@ -224,30 +224,50 @@ if (isset($f->file)) {
 	}
 }
 }
-// Cached per book id (filetype + libfilename), shared with fb2.php/usr.php.
-$meta = get_book_download_meta($dbh, intval($id));
-if ($meta === null) {
+$stmt = false;
+$stmt = $dbh->prepare("SELECT filetype FROM libbook WHERE bookid=:id LIMIT 1");
+$stmt->bindParam(":id",$id);
+$stmt->execute();
+$result = $stmt->fetch();
+if ($result !== false) {
+	$type = trim($result->filetype);
+	if ($type == 'fb2') {
+		$u = '0';
+	} else {
+		$u = '1';
+	}
+} else {
 	echo file_get_contents('/application/none.jpg');
 	die();
 }
-$type = trim($meta->filetype);
-$u = ($type == 'fb2') ? '0' : '1';
+$stmt = null;
 
 if ($type == 'fb2') {
 	$localFb2 = LOCAL_LIBRARY_PATH . $id . '.fb2';
 	if (file_exists($localFb2)) {
 		extractFb2CoverFromZip($localFb2, $id);
 	} else {
-		$zip_name = book_zip_lookup(intval($id), (bool)$u, $dbh);
-		if ($zip_name === null) {
+		$stmt = $dbh->prepare("SELECT filename FROM book_zip WHERE :id BETWEEN start_id AND end_id AND usr=:u");
+		$stmt->bindParam(":id",$id);
+		$stmt->bindParam(":u",$u);
+		$stmt->execute();
+		$result = $stmt->fetch();
+		if (!$result) {
 			error_log("extract_cover: fb2 $id: no book_zip entry and no local file");
 			echo file_get_contents('/application/none.jpg');
 			die();
 		}
-		$filename = $meta->filename;
+		$zip_name = $result->filename;
+		$stmt = null;
+		$stmt = $dbh->prepare("SELECT filename FROM libfilename where BookId=:id");
+		$stmt->bindParam(":id",$id);
+		$stmt->execute();
+		$result = $stmt->fetch();
+		$filename = $result ? $result->filename : null;
 		if ($filename == '') {
 			$filename = trim("$id.fb2");
 		}
+		$stmt = null;
 		if (strtolower(pathinfo($filename, PATHINFO_EXTENSION)) === 'zip') {
 			resolve_inner_zip_book($zip_name, $id, $filename, 'fb2');
 			if (file_exists($localFb2)) {
@@ -260,16 +280,27 @@ if ($type == 'fb2') {
 		}
 	}
 } elseif ($type == 'epub') {
-	$zip_name = book_zip_lookup(intval($id), (bool)$u, $dbh);
-	if ($zip_name === null) {
+	$stmt = $dbh->prepare("SELECT filename FROM book_zip WHERE :id BETWEEN start_id AND end_id AND usr=:u");
+	$stmt->bindParam(":id",$id);
+	$stmt->bindParam(":u",$u);
+	$stmt->execute();
+	$result = $stmt->fetch();
+	if (!$result) {
 		error_log("extract_cover: epub $id: no book_zip entry");
 		echo file_get_contents('/application/none.jpg');
 		die();
 	}
-	$filename = $meta->filename;
+	$zip_name = $result->filename;
+	$stmt = null;
+	$stmt = $dbh->prepare("SELECT filename FROM libfilename where BookId=:id");
+	$stmt->bindParam(":id",$id);
+	$stmt->execute();
+	$result = $stmt->fetch();
+	$filename = $result ? $result->filename : null;
 	if ($filename == '') {
 		$filename = trim("$id.epub");
 	}
+	$stmt = null;
 	try {
 		extractEpubCoverFromZip($zip_name, $filename, $id);
 	} catch (Exception $e) {

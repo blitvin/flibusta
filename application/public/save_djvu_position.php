@@ -1,5 +1,4 @@
 <?php
-// Stores the current DJVU page. Local store only, no database.
 include('../init.php');
 session_start();
 
@@ -23,4 +22,6 @@ if ($bookid <= 0 || $page <= 0) {
 	die();
 }
 
-position_set($user_id, 'djvu', $bookid, $page);
+$stmt = $dbh->prepare("INSERT INTO djvu_progress (user_id, bookid, page) VALUES (?, ?, ?)
+	ON CONFLICT (user_id, bookid) DO UPDATE SET page = EXCLUDED.page");
+$stmt->execute([$user_id, $bookid, $page]);

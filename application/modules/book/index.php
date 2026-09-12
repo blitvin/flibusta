@@ -19,9 +19,11 @@ if (in_array($_selector, ['withannotation', 'contentonly'], true)) {
     $view_mode = 'contentonly';
     $_uid = isset($_SESSION['user_id']) ? intval($_SESSION['user_id']) : 0;
     if ($_uid > 0) {
-        $_mode = get_user_prefs($dbh, $_uid)->book_view_mode;
-        if (in_array($_mode, ['withannotation', 'contentonly'], true)) {
-            $view_mode = $_mode;
+        $_ps = $dbh->prepare("SELECT book_view_mode FROM user_settings WHERE user_id = ?");
+        $_ps->execute([$_uid]);
+        $_pr = $_ps->fetch();
+        if ($_pr && in_array($_pr->book_view_mode, ['withannotation', 'contentonly'], true)) {
+            $view_mode = $_pr->book_view_mode;
         }
     }
 }
@@ -61,16 +63,24 @@ function str_replace_first($from, $to, $content) {
 
 $ext = strtolower(trim($book->filetype));
 
-$zip_name = book_zip_lookup(intval($url->var1), $ext != 'fb2', $dbh);
-if ($zip_name !== null ){
+if ($ext == 'fb2') {
+	$stmt = $dbh->prepare("SELECT * FROM book_zip WHERE ? BETWEEN start_id AND end_id AND usr=0");
+} else {
+	$stmt = $dbh->prepare("SELECT * FROM book_zip WHERE ? BETWEEN start_id AND end_id AND usr=1");
+}
+$stmt->execute([$url->var1]);
+if ($stmt->rowCount() >0 ){
+	$zip_name = $stmt->fetch()->filename;
 	$zip = new ZipArchive();
 
 	// Pre-extract any inner zip so the file is ready in /cache/local/ before it is needed:
 	// - non-fb2 (pdf/epub/djvu/…): JS viewers fetch via usr.php after the page loads
 	// - fb2: fb.php reads from /cache/local/ when available (see fb.php)
 	// Determine the correct inner zip name: libfilename may store the actual name (e.g. Olga_Gromyiko_Grom.fb2.zip)
-	$_meta = get_book_download_meta($dbh, intval($url->var1));
-	$dbFilename = $_meta ? $_meta->filename : null;
+	$fnStmt = $dbh->prepare("SELECT filename FROM libfilename WHERE BookId = ?");
+	$fnStmt->execute([$url->var1]);
+	$fnRow = $fnStmt->fetch();
+	$dbFilename = $fnRow ? $fnRow->filename : null;
 	if ($dbFilename && strtolower(pathinfo($dbFilename, PATHINFO_EXTENSION)) === 'zip') {
 		$innerZipName = $dbFilename;
 	} else {

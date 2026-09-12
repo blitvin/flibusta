@@ -26,8 +26,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 			$stmt->bindParam(':uuid', $delete_uuid);
 			$stmt->execute();
 		}
-		// Favourites changed - drop this user's cached pages/fragments.
-		bump_user_cache_epoch($current_user_id, 'fav');
 	}
 }
 

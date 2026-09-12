@@ -1,8 +1,19 @@
 <?php
 $current_user_id = isset($_SESSION['user_id']) ? intval($_SESSION['user_id']) : 0;
-$bookid = (int)$url->var1;
-$posKind = 'pos';
-include(ROOT_PATH . 'modules/book/position_js.php');
+$savedPos = 0;
+$savePositionUrlPrefix = '';
+if ($current_user_id > 0) {
+    $savePositionUrl = $webroot . '/save_position.php';
+    $saveBookId      = (int)$url->var1;
+    $saveCsrf        = get_csrf_token();
+    $stmt = $dbh->prepare("SELECT pos FROM progress WHERE user_id=:uid AND bookid=:id LIMIT 1");
+    $stmt->bindParam(":uid", $current_user_id);
+    $stmt->bindParam(":id", $url->var1);
+    $stmt->execute();
+    if ($p = $stmt->fetch()) {
+        $savedPos = intval($p->pos ?? 0);
+    }
+}
 echo "<script src='$webroot/js/pdf.js'></script>\n"; ?>
 
 <div id="pdf-toolbar" style="position:sticky;top:0;z-index:10;background:#fff;padding:6px 0;text-align:center;border-bottom:1px solid #ccc;">
@@ -21,29 +32,33 @@ echo "<script src='$webroot/js/pdf.js'></script>\n"; ?>
 var pdfjsLib = window['pdfjs-dist/build/pdf'];
 <?php echo "pdfjsLib.GlobalWorkerOptions.workerSrc = '$webroot/js/pdf.worker.js';\n"; ?>
 
-var currentPage = 1;
+var currentPage = <?= max(1, $savedPos) ?>;
 var numPages = 0;
 var thePDF = null;
 var renderTask = null;
 var canvas = document.getElementById('pdf-canvas');
 var ctx = canvas.getContext('2d');
 
-function savePage(pageNum) { flibPosition.save(pageNum); }
+<?php if ($current_user_id > 0): ?>
+var savePositionUrl = <?= json_encode($savePositionUrl, JSON_UNESCAPED_SLASHES) ?>;
+var saveBookId = <?= (int)$saveBookId ?>;
+var saveCsrf = <?= json_encode($saveCsrf) ?>;
+function savePage(pageNum) {
+    var x = new XMLHttpRequest();
+    x.open("POST", savePositionUrl, true);
+    x.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+    x.send("bookid=" + encodeURIComponent(saveBookId) + "&pos=" + encodeURIComponent(pageNum) + "&csrf_token=" + encodeURIComponent(saveCsrf));
+}
+<?php else: ?>
+function savePage(pageNum) {}
+<?php endif; ?>
 
 pdfjsLib.getDocument(url).promise.then(function(pdf) {
     thePDF = pdf;
     numPages = pdf.numPages;
     document.getElementById('pageCount').textContent = numPages;
+    if (currentPage > numPages) currentPage = numPages;
     renderPage(currentPage);
-    // The saved page arrives asynchronously (see position_js.php); jump to it
-    // once we have it, so the first render does not have to wait for the fetch.
-    flibPosition.load(function (p) {
-        var page = Math.max(1, Math.min(parseInt(p, 10) || 1, numPages));
-        if (page !== currentPage) {
-            currentPage = page;
-            renderPage(currentPage);
-        }
-    });
 });
 
 function renderPage(pageNum) {

@@ -18,7 +18,12 @@ $has_about = count($annotations) > 0;
 $current_user_id = isset($_SESSION['user_id']) ? intval($_SESSION['user_id']) : 0;
 $pref_tab = 'alpha';
 if ($current_user_id > 0) {
-	$pref_tab = get_user_prefs($dbh, $current_user_id)->author_default_tab;
+	$prefStmt = $dbh->prepare("SELECT author_default_tab FROM user_settings WHERE user_id = ?");
+	$prefStmt->execute([$current_user_id]);
+	$pref_row = $prefStmt->fetch();
+	if ($pref_row && $pref_row->author_default_tab) {
+		$pref_tab = $pref_row->author_default_tab;
+	}
 }
 // 'about' falls back to 'alpha' when the author has no annotation
 if ($pref_tab === 'about' && !$has_about) {
@@ -35,9 +40,27 @@ if (isset($a->file) && $a->file != '') {
 }
 echo "<a class='btn btn-primary mt-2 w-100' href='$webroot/?aid=$author_id'>Книги автора</a>";
 
-// Neutral slot; the browser draws the button for whoever is logged in, so this
-// page stays identical for every visitor and can be cached once.
-echo fav_slot('author', (int)$author_id);
+try {
+	if ($current_user_id > 0) {
+		$favStmt = $dbh->prepare("SELECT COUNT(*) cnt FROM fav WHERE user_id=:uid AND avtorid=:id");
+		$favStmt->bindParam(":uid", $current_user_id);
+		$favStmt->bindParam(":id", $author_id);
+		$favStmt->execute();
+		$is_fav = ($favStmt->fetch()->cnt > 0);
+		$action       = $is_fav ? 'unfav_author' : 'fav_author';
+		$button_text  = $is_fav ? 'Из избранного' : 'В избранное';
+		$button_class = $is_fav ? 'btn-warning'   : 'btn-secondary';
+		$csrf = isset($_SESSION['csrf_token']) ? htmlspecialchars($_SESSION['csrf_token']) : '';
+		echo "<form method='POST' action='' style='display:contents;'>
+			<input type='hidden' name='action' value='$action' />
+			<input type='hidden' name='id' value='$author_id' />
+			<input type='hidden' name='csrf_token' value='$csrf' />
+			<button type='submit' class='btn $button_class mt-2 w-100'>$button_text</button>
+		</form>";
+	}
+} catch (PDOException $e) {
+	//
+}
 
 echo "</div>";
 

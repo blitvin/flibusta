@@ -207,9 +207,14 @@ if (isset($_SESSION['search'])) {
 	$fcontent .= "<a class='text-white' href='$webroot/?q'>" . htmlspecialchars($_SESSION['search'], ENT_QUOTES, 'UTF-8') . " <i class='fas fa-times-circle'></i></a></div> ";
 }
 
-if (isset($_SESSION['filter_series'])) {
-	// Neutral slot; the browser draws the button for whoever is logged in.
-	$fcontent .= "<span class='float-end'>" . fav_slot('series', (int)$seqid, $seqname) . "</span> ";
+if (isset($_SESSION['filter_series']) && isset($_SESSION['user_id'])) {
+	$csrf_token = isset($_SESSION['csrf_token']) ? htmlspecialchars($_SESSION['csrf_token']) : '';
+	$fcontent .= "<form method='POST' action='' style='display:inline;' class='float-end'>
+		<input type='hidden' name='action' value='fav_seq' />
+		<input type='hidden' name='id' value='$seqid' />
+		<input type='hidden' name='csrf_token' value='$csrf_token' />
+		<button type='submit' class='btn btn-sm btn-info'>$seqname в Избранное</button>
+	</form> ";
 }
 
 echo "<div class='block rounded' style='margin-bottom:8px;'>";

@@ -19,19 +19,6 @@ services:
            - FLIBUSTA_TRUSTED_NET='{адрес локальной сети в которой вы разрешаете пользоваться библиотекой без пароля , например 192.168.1.0/24}'
            - FLIBUSTA_URL=https://flibusta.is
            - FLIBUSTA_ENABLE_MISSING_BOOK_DOWNLOAD=true
-           # Кэширование страниц и данных. files (по умолчанию) - кэш в каталоге
-           # /cache, дополнительных сервисов не требует. none - отключить кэш.
-           # redis - использовать внешний сервис redis (см. переменные ниже);
-           # контейнер flibusta-fpm должен быть подключен к сети этого сервиса.
-           - FLIBUSTA_CACHE_BACKEND=files
-           #- FLIBUSTA_REDIS_HOST=redis
-           #- FLIBUSTA_REDIS_PORT=6379
-           #- FLIBUSTA_REDIS_DB=0
-           #- FLIBUSTA_REDIS_PASSWORD_FILE=/run/secrets/FLIBUSTA_REDIS_PWD
-           # Время жизни кэша в секундах (страховка: основная инвалидация
-           # происходит при импорте БД и при изменении настроек/избранного).
-           #- FLIBUSTA_PAGE_CACHE_TTL=21600
-           #- FLIBUSTA_DATA_CACHE_TTL=86400
         networks:
            flibusta_net:
              ipv4_address: {дайте адрес в сети докера}

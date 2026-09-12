@@ -1,5 +1,4 @@
 <?php
-// Stores the EPUB reading location (CFI). Local store only, no database.
 include('../init.php');
 session_start();
 
@@ -22,5 +21,6 @@ if ($bookid <= 0 || $cfi === '') {
 	die();
 }
 
-// Bound the stored value: it comes from the client and lands in a shared file.
-position_set($user_id, 'epub', $bookid, substr($cfi, 0, 512));
+$stmt = $dbh->prepare("INSERT INTO epub_progress (user_id, bookid, cfi) VALUES (?, ?, ?)
+	ON CONFLICT (user_id, bookid) DO UPDATE SET cfi = EXCLUDED.cfi");
+$stmt->execute([$user_id, $bookid, $cfi]);

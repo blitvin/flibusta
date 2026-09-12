@@ -1470,9 +1470,20 @@ CREATE TABLE public.users (
 );
 ALTER TABLE public.users OWNER TO :FLIBUSTA_DBUSER;
 
--- Sessions are NOT stored in the database: they live as files on the /cache
--- volume (application/FileSessionHandler.php), so that a request served from
--- the page cache needs no database connection at all.
+CREATE TABLE public.php_sessions (
+    id            VARCHAR(128) NOT NULL PRIMARY KEY,
+    data          BYTEA NOT NULL,       -- The serialized session data
+    user_id INT REFERENCES users(id) ON DELETE CASCADE,
+    username VARCHAR(50),
+    ip_address INET,
+    user_agent TEXT,
+    last_accessed TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+
+ALTER TABLE public.php_sessions OWNER TO :FLIBUSTA_DBUSER;
+-- Index for the garbage collector to find old sessions quickly
+CREATE INDEX idx_sessions_expiry ON public.php_sessions(last_accessed);
 
 CREATE TABLE public.login_attempts (
     ip_address INET NOT NULL,

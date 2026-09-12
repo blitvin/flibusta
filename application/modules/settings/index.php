@@ -47,8 +47,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmt = $dbh->prepare("UPDATE users SET password_hash = ? WHERE id = ?");
                 $stmt->execute([$new_hash, $current_user_id]);
                 // Invalidate other sessions, keep current one alive
-                session_store_destroy_user((int)$current_user_id, session_id());
-                bump_user_cache_epoch((int)$current_user_id, 'prefs');
+                $stmt = $dbh->prepare("DELETE FROM php_sessions WHERE user_id = ? AND id != ?");
+                $stmt->execute([$current_user_id, session_id()]);
                 $password_success = 'Пароль успешно изменён.';
             } else {
                 $password_error = 'Неверный текущий пароль.';
@@ -73,9 +73,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                                 author_default_tab = EXCLUDED.author_default_tab,
                                                 book_view_mode     = EXCLUDED.book_view_mode");
         $stmt->execute([$current_user_id, $new_redirect, $new_author_tab, $new_book_mode]);
-        // Preferences change what this user's pages look like: drop their cached
-        // pages and settings fragments right away, including for this request.
-        bump_user_cache_epoch((int)$current_user_id, 'prefs');
         $login_redirect     = $new_redirect;
         $author_default_tab = $new_author_tab;
         $book_view_mode     = $new_book_mode;
@@ -116,8 +113,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             }
             $dbh->commit();
-            // Hidden genres filter every book listing this user sees.
-            bump_user_cache_epoch((int)$current_user_id, 'prefs');
             $excluded        = $ids;   // refresh so the re-rendered checkboxes show post-save state
             $xgenres_success = 'Список скрытых жанров сохранён.';
         } catch (Exception $e) {

@@ -70,12 +70,6 @@ mkdir -p /cache/locks
 mkdir -p /cache/processing
 mkdir -p /cache/timestamps
 mkdir -p /cache/clearlists
-# Sessions and reading positions moved out of Postgres; pagecache/appcache back
-# the file cache backend (FLIBUSTA_CACHE_BACKEND=files).
-mkdir -p /cache/sessions
-mkdir -p /cache/positions
-mkdir -p /cache/pagecache
-mkdir -p /cache/appcache
 
 touch /cache/locks/dbupdate.lock
 touch /cache/locks/adminop.lock
@@ -83,12 +77,7 @@ touch /cache/timestamps/getcovers
 touch /cache/timestamps/getsql
 touch /cache/timestamps/app_reindex
 touch /cache/timestamps/update_daily
-# mtime of this file is the global cache epoch: touching it invalidates every
-# cached page and fragment, whatever backend is in use.
-touch /cache/timestamps/cache_epoch
 touch /cache/login_attempts/flibusta_login_attempts.log
-# Session files must not be world-readable: they authenticate their bearer.
-chmod 770 /cache/sessions
 
 rsync -av --delete --checksum /public_files/ /public_mountpoint/
 echo Checking whether migration is required
@@ -115,17 +104,6 @@ if [ ! -z "$FLIBUSTA_APP_ADMIN" ]; then
 fi
 
 
-
-# One-time move of reading positions from Postgres to /cache/positions. The
-# source tables stay in place (dormant) so this release can be rolled back.
-if [ ! -f /cache/positions/.migrated ]; then
-    echo "Migrating reading positions to local files"
-    if php /tools/migrate_positions_to_files.php; then
-        touch /cache/positions/.migrated
-    else
-        echo "WARNING: reading position migration failed, will retry on next start"
-    fi
-fi
 
 chown -R www-data:www-data /sql/*
 chown -R www-data:www-data /cache/*

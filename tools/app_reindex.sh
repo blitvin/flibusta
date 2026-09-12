@@ -23,10 +23,6 @@ echo "Создание индекса zip-файлов"
 php /tools/update_zip_list.php  > /cache/log/update_zip_list.log
 echo "Сканирование zip-файлов завершено"
 date > /cache/timestamps/app_reindex
-# Library content changed: invalidate every cached page and fragment (see
-# app_import_sql.sh).
-date > /cache/timestamps/cache_epoch
-rm -rf /cache/pagecache/* /cache/appcache/*
 
 echo "app_reindex_sql.sh : finished" >&2
 exec 200>&-

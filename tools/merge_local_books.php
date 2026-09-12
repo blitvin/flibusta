@@ -16,7 +16,6 @@
 
 error_reporting(E_ALL);
 include('/application/dbinit.php');
-include_once('/application/positions.php');
 
 // Runs standalone under the CLI (dbinit.php only, no init.php), so define the
 // shared constant here too. Keep in sync with application/init.php.
@@ -45,8 +44,12 @@ function local_zip_path(int $bookid, string $ext): string {
 // Remap user data (favorites, reading positions) from one book id to another,
 // then delete leftovers that would collide with existing rows.
 function remap_user_data(PDO $dbh, int $fromId, int $toId): void {
-	// Reading positions live in per-user files on the /cache volume, not in the DB.
-	positions_remap_book($fromId, $toId);
+	foreach (['progress', 'epub_progress', 'djvu_progress'] as $tbl) {
+		$dbh->prepare("UPDATE $tbl SET bookid = :to WHERE bookid = :from
+			AND NOT EXISTS (SELECT 1 FROM $tbl t2 WHERE t2.user_id = $tbl.user_id AND t2.bookid = :to2)")
+			->execute([':to' => $toId, ':from' => $fromId, ':to2' => $toId]);
+		$dbh->prepare("DELETE FROM $tbl WHERE bookid = :from")->execute([':from' => $fromId]);
+	}
 	$dbh->prepare("UPDATE fav SET bookid = :to WHERE bookid = :from
 		AND NOT EXISTS (SELECT 1 FROM fav f2 WHERE f2.bookid = :to2
 			AND f2.list_uuid IS NOT DISTINCT FROM fav.list_uuid

@@ -7,11 +7,18 @@ CREATE TABLE IF NOT EXISTS users (
 );
 
 
--- Sessions moved to files on the /cache volume (application/FileSessionHandler.php).
--- Keeping them in Postgres forced a SELECT + UPSERT - and therefore a database
--- connection - on every single request, which defeated page caching entirely.
--- Existing rows are not migrated: users simply log in again.
-DROP TABLE IF EXISTS php_sessions;
+CREATE TABLE IF NOT EXISTS php_sessions (
+    id            VARCHAR(128) NOT NULL PRIMARY KEY,
+    data          BYTEA NOT NULL,
+    user_id INT REFERENCES users(id) ON DELETE CASCADE,
+    username VARCHAR(50),
+    ip_address INET,
+    user_agent TEXT,
+    last_accessed TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_sessions_last_accessed 
+ON php_sessions (last_accessed);
 
 
 
@@ -102,6 +109,9 @@ CREATE TABLE IF NOT EXISTS djvu_progress (
 
 -- Add last_book column to user_settings for "return to last opened book" redirect option
 ALTER TABLE IF EXISTS public.user_settings ADD COLUMN IF NOT EXISTS last_book INT;
+
+-- Allow anonymous (not-logged-in) sessions: user_id must be nullable
+ALTER TABLE IF EXISTS public.php_sessions ALTER COLUMN user_id DROP NOT NULL;
 
 -- Drop legacy seqname table (was empty; replaced by libseqname_ts for FTS)
 DROP TABLE IF EXISTS public.seqname CASCADE;
