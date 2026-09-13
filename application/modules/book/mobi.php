@@ -9,6 +9,7 @@
 echo "<script src='$webroot/js/mobi.min.js'></script>\n";
 ?>
 <iframe id="bookframe" class="bookframe"
+	style="display:block;width:100%;border:0"
 	sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
 	referrerpolicy="no-referrer"></iframe>
 <?php echo "<script src='$webroot/js/bookframe.js'></script>\n"; ?>

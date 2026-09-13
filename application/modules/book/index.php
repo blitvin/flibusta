@@ -63,11 +63,15 @@ if (in_array($ext, $progress_formats, true)) {
 }
 
 if (in_array($ext, $framed_formats, true)) {
-    echo "<script src='$webroot/js/bookframe.js'></script>";
+    // The frame must exist before bookframe.js runs, or it has nothing to size.
+    // The layout-critical declarations are inline as well as in .bookframe, so a
+    // stale stylesheet cannot drop the frame back to its intrinsic 300x150 box.
     echo "<iframe id='bookframe' class='bookframe' src='$webroot/book/content/$_bid'"
+       . " style='display:block;width:100%;border:0'"
        . " sandbox='allow-same-origin allow-popups allow-popups-to-escape-sandbox'"
        . " referrerpolicy='no-referrer' title='"
        . htmlspecialchars($book->title, ENT_QUOTES, 'UTF-8') . "'></iframe>";
+    echo "<script src='$webroot/js/bookframe.js'></script>";
 } else {
     // Resolves the archive, pre-extracts an inner zip and falls back to the
     // mirror, so the file is on disk before the viewer requests it via usr.php.
