@@ -16,9 +16,13 @@ $login_redirect     = $saved ? $saved->login_redirect     : 'default';
 $author_default_tab = $saved ? $saved->author_default_tab : 'alpha';
 $book_view_mode     = $saved ? $saved->book_view_mode     : 'contentonly';
 
+$excluded = get_excluded_genres($dbh, $current_user_id);
+
 $password_success = '';
 $password_error   = '';
 $settings_success = '';
+$xgenres_success  = '';
+$xgenres_error    = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $token = $_POST['csrf_token'] ?? '';
@@ -73,6 +77,51 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $author_default_tab = $new_author_tab;
         $book_view_mode     = $new_book_mode;
         $settings_success   = 'Настройки сохранены.';
+    } elseif (isset($_POST['save_excluded_genres'])) {
+        // NB: this branch has its own submit name on purpose. The three
+        // preference forms above all post save_settings and each posts only its
+        // own field, so that branch rewrites all three columns; reusing it here
+        // would silently reset the user's other preferences on every save.
+        $ids = [];
+        foreach ((array)($_POST['excluded_genres'] ?? []) as $g) {
+            if (ctype_digit((string)$g)) {
+                $ids[] = (int)$g;
+            }
+        }
+        $ids = array_values(array_slice(array_unique($ids), 0, MAX_EXCLUDED_GENRES));
+        if ($ids) {
+            // Drop unknown ids silently, matching the "validate, coerce, never
+            // error" idiom used by the other settings. DISTINCT because
+            // libgenrelist's key is (genreid, genrecode): one genre can have
+            // several alias rows.
+            $in  = implode(',', $ids);   // safe: every element passed ctype_digit + (int)
+            $chk = $dbh->query("SELECT DISTINCT genreid FROM libgenrelist WHERE genreid IN ($in)");
+            $ok  = [];
+            while ($r = $chk->fetch()) {
+                $ok[] = (int)$r->genreid;
+            }
+            $ids = $ok;
+        }
+        try {
+            $dbh->beginTransaction();
+            $dbh->prepare("DELETE FROM user_excluded_genres WHERE user_id = ?")->execute([$current_user_id]);
+            if ($ids) {
+                $ins = $dbh->prepare("INSERT INTO user_excluded_genres (user_id, genreid)
+                    VALUES (?, ?) ON CONFLICT DO NOTHING");
+                foreach ($ids as $gid) {
+                    $ins->execute([$current_user_id, $gid]);
+                }
+            }
+            $dbh->commit();
+            $excluded        = $ids;   // refresh so the re-rendered checkboxes show post-save state
+            $xgenres_success = 'Список скрытых жанров сохранён.';
+        } catch (Exception $e) {
+            if ($dbh->inTransaction()) {
+                $dbh->rollBack();
+            }
+            error_log('Flibusta: excluded genres save failed: ' . $e->getMessage());
+            $xgenres_error = 'Не удалось сохранить список жанров.';
+        }
     }
 }
 
@@ -92,6 +141,29 @@ $bvm_checked = [
     'withannotation' => $book_view_mode === 'withannotation' ? 'checked' : '',
     'contentonly'    => $book_view_mode === 'contentonly'    ? 'checked' : '',
 ];
+
+// Genre dictionary for the hidden-genres card, grouped by genremeta.
+// DISTINCT ON (genreid) because libgenrelist's key is (genreid, genrecode) and
+// one genre may have several alias rows, which would render duplicate options.
+// It needs its own subquery: Postgres requires ORDER BY to lead with the
+// DISTINCT ON expression, but we want display order by meta then description.
+$xg_rows = $dbh->query("SELECT genreid, genredesc, genremeta FROM (
+        SELECT DISTINCT ON (genreid) genreid, genredesc, genremeta
+        FROM libgenrelist ORDER BY genreid, genrecode
+    ) t ORDER BY genremeta, genredesc");
+$xg_selected = array_flip($excluded);
+
+// Group rows by meta so a <details> block can be marked open when it holds a
+// checked genre, and build the summary badges for the saved list.
+$xg_groups = [];
+$xg_labels = [];
+while ($g = $xg_rows->fetch()) {
+    $gid = (int)$g->genreid;
+    $xg_groups[$g->genremeta][] = ['id' => $gid, 'desc' => $g->genredesc];
+    if (isset($xg_selected[$gid])) {
+        $xg_labels[$gid] = $g->genremeta . ': ' . $g->genredesc;
+    }
+}
 ?>
 
 <div class="row mt-3">
@@ -218,4 +290,80 @@ $bvm_checked = [
     </div>
   </div>
 
+</div>
+
+<div class="row">
+  <div class="col-12">
+    <div class="card mb-4">
+      <div class="card-header">Скрытые жанры</div>
+      <div class="card-body">
+
+        <?php if ($xgenres_success !== ''): ?>
+          <div class="alert alert-success"><?= htmlspecialchars($xgenres_success, ENT_QUOTES, 'UTF-8') ?></div>
+        <?php endif; ?>
+        <?php if ($xgenres_error !== ''): ?>
+          <div class="alert alert-danger"><?= htmlspecialchars($xgenres_error, ENT_QUOTES, 'UTF-8') ?></div>
+        <?php endif; ?>
+
+        <p class="text-muted">
+          Книги отмеченных жанров не будут показываться в списке книг на главной странице.
+          Скрытие можно временно отключить кнопкой &laquo;Все жанры&raquo; на главной.
+        </p>
+
+        <p>
+          <?php if (empty($xg_labels)): ?>
+            <span class="text-muted">Ничего не скрыто.</span>
+          <?php else: ?>
+            <?php foreach ($xg_labels as $lbl): ?>
+              <span class="badge bg-secondary mb-1"><?= htmlspecialchars($lbl, ENT_QUOTES, 'UTF-8') ?></span>
+            <?php endforeach; ?>
+          <?php endif; ?>
+        </p>
+
+        <form method="POST" id="xgenresForm">
+          <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8') ?>">
+          <?php foreach ($xg_groups as $meta => $items): ?>
+            <?php
+              $groupHasChecked = false;
+              foreach ($items as $it) {
+                  if (isset($xg_selected[$it['id']])) { $groupHasChecked = true; break; }
+              }
+            ?>
+            <details class="mb-2"<?= $groupHasChecked ? ' open' : '' ?>>
+              <summary><?= htmlspecialchars($meta, ENT_QUOTES, 'UTF-8') ?></summary>
+              <div class="row ms-1 mt-1">
+                <?php foreach ($items as $it): ?>
+                  <div class="col-sm-6 col-md-4">
+                    <div class="form-check">
+                      <input class="form-check-input" type="checkbox" name="excluded_genres[]"
+                        id="xg_<?= $it['id'] ?>" value="<?= $it['id'] ?>"
+                        <?= isset($xg_selected[$it['id']]) ? 'checked' : '' ?>>
+                      <label class="form-check-label" for="xg_<?= $it['id'] ?>">
+                        <?= htmlspecialchars($it['desc'], ENT_QUOTES, 'UTF-8') ?>
+                      </label>
+                    </div>
+                  </div>
+                <?php endforeach; ?>
+              </div>
+            </details>
+          <?php endforeach; ?>
+
+          <div class="mt-3">
+            <button type="submit" name="save_excluded_genres" class="btn btn-primary">Сохранить</button>
+            <button type="button" class="btn btn-outline-secondary" id="xgenresClear">Снять все</button>
+            <span class="text-muted ms-2">Не более <?= MAX_EXCLUDED_GENRES ?> жанров.</span>
+          </div>
+        </form>
+
+        <script>
+        document.getElementById('xgenresClear').addEventListener('click', function () {
+            document.querySelectorAll('#xgenresForm input[name="excluded_genres[]"]').forEach(function (c) {
+                c.checked = false;
+            });
+        });
+        </script>
+
+      </div>
+    </div>
+  </div>
 </div>

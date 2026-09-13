@@ -22,6 +22,9 @@ define('TIMESTAPS_PATH','/cache/timestamps/');
 // tools/merge_local_books.php, which runs standalone under the CLI.
 define('LOCAL_ID_BASE', 10000000);
 define('RECORDS_PAGE', 10);
+// Upper bound on a user's personal hidden-genre list. Also bounds the inlined
+// IN (...) list built in modules/primary/index.php.
+define('MAX_EXCLUDED_GENRES', 100);
 define('BOOKS_PAGE', 10);
 define('AUTHORS_PAGE', 50);
 define('SERIES_PAGE', 50);

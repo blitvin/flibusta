@@ -59,11 +59,26 @@ if (isset($_GET['xgid'])) {
 	}
 }
 
+// Personal hidden-genre list (Настройки -> "Скрытые жанры").
+// The session key stores the NEGATION ("switched off for this session"), so the
+// list applies by default with no session write at all - which also means
+// sessions created before this feature existed behave correctly.
+if (isset($_GET['xgl'])) {
+	if ($_GET['xgl'] == '') {
+		unset($_SESSION['xgenres_off']);
+	} else {
+		$_SESSION['xgenres_off'] = true;
+	}
+}
+
 
 $filter = '';
 $fcontent = '';
 $join = '';
 $cols = '';
+
+$xgenres = isset($_SESSION['user_id']) ? get_excluded_genres($dbh, $_SESSION['user_id']) : [];
+$xgenres_active = $xgenres && !isset($_SESSION['xgenres_off']);
 
 
 $fcontent .= '<div class="btn-group mt-1 me-1" role="group">';
@@ -79,6 +94,16 @@ if (isset($_SESSION['ru'])) {
 	$fcontent .= "<a class='btn bg-success text-white bg-opacity-90 text-white' href='$webroot/?ru'>На русском</a> ";
 } else {
 	$fcontent .= "<a class='btn bg-success text-white bg-opacity-50 text-white' href='$webroot/?ru=1'>Все языки</a> ";
+}
+
+// Shown only to users who actually have a hidden-genre list.
+if ($xgenres) {
+	$n = count($xgenres);
+	if ($xgenres_active) {
+		$fcontent .= "<a class='btn bg-danger text-white bg-opacity-90' title='Скрыто жанров: $n. Список настраивается в разделе «Настройки».' href='$webroot/?xgl=1'>Без скрытых жанров</a> ";
+	} else {
+		$fcontent .= "<a class='btn bg-danger text-white bg-opacity-50' title='Скрытие жанров отключено до конца сеанса' href='$webroot/?xgl'>Все жанры</a> ";
+	}
 }
 $fcontent .= '</div>';
 
@@ -114,7 +139,10 @@ if (isset($_SESSION['filter_genre'])) {
 }
 
 if (isset($_SESSION['filter_xgenre'])) {
-	$filter .= 'AND (SELECT COUNT(*) FROM libgenre xg WHERE xg.BookId=B.BookId AND xg.genreid=:xgid) = 0';
+	// NB: the trailing space is required - the series and search fragments are
+	// appended after this one, and "= 0AND ..." is a syntax error on PG 15+
+	// ("trailing junk after numeric literal").
+	$filter .= 'AND (SELECT COUNT(*) FROM libgenre xg WHERE xg.BookId=B.BookId AND xg.genreid=:xgid) = 0 ';
 	$stmt = $dbh->prepare("SELECT * FROM libgenrelist
 		WHERE genreid=:id");
 	$stmt->bindParam(":id", $_SESSION['filter_xgenre']);
@@ -123,6 +151,25 @@ if (isset($_SESSION['filter_xgenre'])) {
 
 	$fcontent .= "<div class='badge bg-secondary p-1 text-white'>";
 	$fcontent .= "<a style='text-decoration: line-through;' class='text-white' href='$webroot/?xgid'>$xg->genremeta: $xg->genredesc <i class='fas fa-times-circle'></i></a></div> ";
+}
+
+if ($xgenres_active) {
+	// Never hide the genre the user explicitly asked to browse, or the page
+	// would come back empty with no explanation. Mirrors the gid/xgid
+	// de-confliction near the top of this file.
+	$applied = $xgenres;
+	if (isset($_SESSION['filter_genre'])) {
+		$applied = array_values(array_diff($applied, [intval($_SESSION['filter_genre'])]));
+	}
+	if ($applied) {
+		// Ids are (int) values from get_excluded_genres(), never user text, so
+		// inlining is safe. It is also deliberate: $filter is shared by the main
+		// SELECT and the COUNT query below, so an inlined list keeps the two in
+		// sync with no changes to either bind block (EMULATE_PREPARES is off, so
+		// a placeholder cannot be reused and PDO cannot bind an array).
+		$in = implode(',', $applied);
+		$filter .= "AND NOT EXISTS (SELECT 1 FROM libgenre xg2 WHERE xg2.bookid=b.bookid AND xg2.genreid IN ($in)) ";
+	}
 }
 
 

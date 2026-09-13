@@ -1066,6 +1066,43 @@ function get_login_redirect($pdo, $user_id, $webroot) {
 	return $base;
 }
 
+/**
+ * A user's personal hidden-genre list, as an array of ints.
+ *
+ * Read per request like every other user setting (author_default_tab,
+ * book_view_mode, login_redirect) rather than cached in $_SESSION: sessions
+ * are shared across tabs and live up to a year for trusted-network clients,
+ * so a cached copy would go stale after a save on another device.
+ * The static cache below is request-scoped only.
+ *
+ * The (int) cast is the single point of origin that makes it safe for callers
+ * to inline these ids into an SQL IN (...) list.
+ */
+function get_excluded_genres($pdo, $user_id) {
+	static $cache = [];
+	$user_id = intval($user_id);
+	if ($user_id <= 0) {
+		return [];
+	}
+	if (isset($cache[$user_id])) {
+		return $cache[$user_id];
+	}
+	$out = [];
+	try {
+		$stmt = $pdo->prepare("SELECT genreid FROM user_excluded_genres WHERE user_id = ? ORDER BY genreid");
+		$stmt->execute([$user_id]);
+		while ($r = $stmt->fetch()) {
+			$out[] = (int)$r->genreid;
+		}
+	} catch (Exception $e) {
+		// Fail open: a broken preference must never break browsing.
+		error_log('Flibusta: excluded genres read failed: ' . $e->getMessage());
+		return [];
+	}
+	$cache[$user_id] = $out;
+	return $out;
+}
+
 function cleanupUserMgmtTables($pdo) {
 	$pdo->query("DELETE FROM login_attempts  WHERE attempt_time < NOW() - INTERVAL '30 days'");
 	$pdo->query("DELETE FROM php_sessions WHERE last_accessed < NOW() - INTERVAL '2 days'");

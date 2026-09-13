@@ -101,6 +101,12 @@ All page requests are rewritten by the web server to `application/public/index.p
   `flock` over `ADMINOPLOCKFILE`; the UI polls `ADMINOPSTATUSFILE` for progress.
 - **Sessions** are stored in Postgres via `application/PostgresSessionHandler.php`;
   clients on the trusted network get long-lived sessions.
+
+- **User settings** (`user_settings` table + the `user_excluded_genres` child
+  table) are read **per request** from the DB — they are deliberately never
+  cached in `$_SESSION`, because sessions are shared across tabs and long-lived
+  for trusted-network clients, so a cached copy would go stale after a save on
+  another device. Follow this convention when adding a setting.
 - **Locally added books** (`addbook` module, admin-only): stored durably in
   `local_*` tables with ids from sequences starting at 10000000 (dump ids never
   reach that); also dual-written into the `lib*` tables so they are live

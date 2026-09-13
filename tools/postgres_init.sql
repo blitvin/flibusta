@@ -1522,6 +1522,23 @@ CREATE TABLE public.user_settings (
 
 ALTER TABLE public.user_settings OWNER TO :FLIBUSTA_DBUSER;
 
+--
+-- Per-user hidden genres (settings module -> "Скрытые жанры"). Books in these
+-- genres are filtered out of the main book list.
+-- Deliberately no FK to libgenrelist: that table is TRUNCATEd and reloaded on
+-- every dump import (tools/app_topg), and its primary key is the pair
+-- (genreid, genrecode), so genreid alone is not referenceable. Stale ids are
+-- harmless - they simply match no book.
+--
+
+CREATE TABLE public.user_excluded_genres (
+    user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    genreid BIGINT NOT NULL,
+    PRIMARY KEY (user_id, genreid)
+);
+
+ALTER TABLE public.user_excluded_genres OWNER TO :FLIBUSTA_DBUSER;
+
 CREATE TABLE public.epub_progress (
     user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     bookid BIGINT NOT NULL,

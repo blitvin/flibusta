@@ -174,3 +174,18 @@ CREATE INDEX IF NOT EXISTS idx_libavtorname_trgm ON public.libavtorname
     USING gin ((lastname || ' ' || firstname || ' ' || middlename || ' ' || nickname) gin_trgm_ops);
 CREATE INDEX IF NOT EXISTS idx_libbook_title_trgm ON public.libbook
     USING gin (title gin_trgm_ops);
+
+-- ============================================================================
+-- Migration: per-user hidden genres (settings module -> "Скрытые жанры")
+-- Books in these genres are filtered out of the main book list.
+-- Deliberately no FK to libgenrelist: that table is TRUNCATEd and reloaded on
+-- every dump import, and its primary key is the pair (genreid, genrecode), so
+-- genreid alone is not referenceable. Stale ids are harmless - they simply
+-- match no book, and the genre may come back in a later dump.
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS public.user_excluded_genres (
+    user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    genreid BIGINT NOT NULL,
+    PRIMARY KEY (user_id, genreid)
+);
