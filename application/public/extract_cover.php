@@ -44,6 +44,46 @@ function lastm($path) {
 }
 
 /**
+ * Negative cache for books that have no cover anywhere.
+ *
+ * Without it every cold request for a coverless book repeats the whole lookup —
+ * two queries plus, for fb2, a full XML parse of the book straight out of its
+ * zip — and a listing page does that once per book per visitor.
+ */
+function cover_miss_marker($id) {
+	return CACHE_PATH . "covers/" . intval($id) . ".none";
+}
+
+/**
+ * True when a recorded miss still stands.
+ *
+ * A freshly downloaded cover archive may hold a cover the book lacked before,
+ * so a marker older than lib.b.attached.zip is ignored and the lookup runs
+ * again. "Очистить кэш" wipes /cache/covers/* and so drops the markers outright.
+ */
+function cover_miss_is_fresh($id) {
+	$marker = cover_miss_marker($id);
+	if (!file_exists($marker)) {
+		return false;
+	}
+	$archive = CACHE_PATH . 'lib.b.attached.zip';
+	if (file_exists($archive) && filemtime($archive) > filemtime($marker)) {
+		return false;
+	}
+	return true;
+}
+
+/** Record that this book has no cover, serve the placeholder and stop. */
+function cover_placeholder($id) {
+	if (!@touch(cover_miss_marker($id))) {
+		error_log('extract_cover: cannot write miss marker for book ' . intval($id)
+			. ' — is ' . CACHE_PATH . 'covers/ writable?');
+	}
+	echo file_get_contents('/application/none.jpg');
+	exit;
+}
+
+/**
  * Extracts the cover image from an FB2 file stored inside a ZIP archive.
  *
  * @param string $zipPath    Path to the .zip archive.
@@ -195,20 +235,38 @@ if ($small) {
 	}
 }
 
+// Nothing was found last time and nothing has changed since: skip the lookup
+// and the two queries it needs.
+if (cover_miss_is_fresh($id)) {
+	echo file_get_contents('/application/none.jpg');
+	die();
+}
+
+// Most fb2 books carry no cover of their own; Flibusta keeps those images in
+// lib.b.attached.zip, which the "Скачать обложки" operation downloads. Every
+// failure below used to fall through silently, which made a missing archive
+// indistinguishable from a book that simply has no cover.
 $stmt = $dbh->prepare("SELECT file FROM libbpics WHERE BookId=:id");
 $stmt->bindParam(":id",$id);
 $stmt->execute();
 $f = $stmt->fetch();
-if ($f !== false) {
-
-if (isset($f->file)) {
+if ($f !== false && isset($f->file) && $f->file !== '') {
+	$archive = CACHE_PATH . "lib.b.attached.zip";
 	$zip = new ZipArchive();
-	if ($zip->open(CACHE_PATH . "lib.b.attached.zip") === true) {
+	if ($zip->open($archive) !== true) {
+		error_log("extract_cover: book $id: libbpics names cover '$f->file' but $archive"
+			. (file_exists($archive) ? " cannot be opened" : " does not exist")
+			. " — run \"Скачать обложки\"");
+	} else {
 		$fdata = $zip->getFromName($f->file);
 		$zip->close();
-		if (strlen($fdata) > 0) {
+		if ($fdata === false || strlen($fdata) === 0) {
+			error_log("extract_cover: book $id: entry '$f->file' is missing or empty inside $archive");
+		} else {
 			$img = imagecreatefromstring($fdata);
-			if ($img !== false) {
+			if ($img === false) {
+				error_log("extract_cover: book $id: entry '$f->file' is not a decodable image");
+			} else {
 				imagejpeg($img, CACHE_PATH . "covers/$id.jpg", 90);
 				$thm = resizeCover($fdata, 300, 400);
 				imagejpeg($thm, CACHE_PATH . "covers/$id-small.jpg", 75);
@@ -224,10 +282,11 @@ if (isset($f->file)) {
 						die();
 					}
 				}
+				error_log("extract_cover: book $id: cover decoded but "
+					. CACHE_PATH . "covers/ did not receive the file — check permissions");
 			}
 		}
 	}
-}
 }
 $stmt = false;
 $stmt = $dbh->prepare("SELECT filetype FROM libbook WHERE bookid=:id LIMIT 1");
@@ -242,8 +301,8 @@ if ($result !== false) {
 		$u = '1';
 	}
 } else {
-	echo file_get_contents('/application/none.jpg');
-	die();
+	error_log("extract_cover: book $id: no libbook row");
+	cover_placeholder($id);
 }
 $stmt = null;
 
@@ -259,8 +318,7 @@ if ($type == 'fb2') {
 		$result = $stmt->fetch();
 		if (!$result) {
 			error_log("extract_cover: fb2 $id: no book_zip entry and no local file");
-			echo file_get_contents('/application/none.jpg');
-			die();
+			cover_placeholder($id);
 		}
 		$zip_name = $result->filename;
 		$stmt = null;
@@ -292,8 +350,7 @@ if ($type == 'fb2') {
 	$result = $stmt->fetch();
 	if (!$result) {
 		error_log("extract_cover: epub $id: no book_zip entry");
-		echo file_get_contents('/application/none.jpg');
-		die();
+		cover_placeholder($id);
 	}
 	$zip_name = $result->filename;
 	$stmt = null;
@@ -312,8 +369,9 @@ if ($type == 'fb2') {
 		error_log("extract_cover: epub $id: " . $e->getMessage());
 	}
 } else {
-	echo file_get_contents('/application/none.jpg');
-	die();
+	// pdf, djvu, docx, ... — no cover is extracted from these at all, so the
+	// marker stops the two queries above from running again for every request.
+	cover_placeholder($id);
 }
 
 if ($small) {
@@ -324,5 +382,8 @@ if ($small) {
 if (file_exists($fname)) {
 	lastm($fname);
 } else {
-	echo file_get_contents('/application/none.jpg');
+	// The extractors above have already logged why they came up empty. Record
+	// the miss so the next request skips the queries and the XML parse: this is
+	// the path a coverless fb2 takes, and it is the expensive one.
+	cover_placeholder($id);
 }
