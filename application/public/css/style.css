@@ -103,6 +103,17 @@ canvas {
 	width: 100%;
 }
 
+/* Sandboxed frame holding a book's own markup; bookframe.js grows it to the
+   full content height so the page, not the frame, does the scrolling. */
+.bookframe {
+	display: block;
+	width: 100%;
+	min-height: 60vh;
+	border: 0;
+	background: #fff;
+	overflow: hidden;
+}
+
 .epub-view {
 	width: 100% !important;
 }

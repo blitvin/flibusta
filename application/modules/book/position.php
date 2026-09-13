@@ -1,7 +1,16 @@
 <?php
+/**
+ * Reading-position plumbing shared by every format whose page scrolls
+ * (fb2, txt, html, mobi, docx, rtf — all stored in the `progress` table).
+ *
+ * This used to be copy-pasted into each of those six renderers. epub and djvu
+ * keep their own, because they store a CFI / page number rather than a percent.
+ *
+ * Emits: bookSavedPos (percent, 0 when none) and bookRestorePosition(), which
+ * each renderer calls once its content has height.
+ */
 $current_user_id = isset($_SESSION['user_id']) ? intval($_SESSION['user_id']) : 0;
 $savedPos = 0;
-$savePositionUrlPrefix = '';
 if ($current_user_id > 0) {
 	$savePositionUrl = $webroot . '/save_position.php';
 	$saveBookId      = (int)$url->var1;
@@ -16,6 +25,13 @@ if ($current_user_id > 0) {
 }
 ?>
 <script>
+var bookSavedPos = <?= json_encode($savedPos) ?>;
+
+function bookRestorePosition() {
+	if (bookSavedPos > 0) {
+		window.scrollTo(0, document.body.scrollHeight / 100 * bookSavedPos);
+	}
+}
 <?php if ($current_user_id > 0): ?>
 var isScrolling;
 var savePositionUrl = <?= json_encode($savePositionUrl, JSON_UNESCAPED_SLASHES) ?>;
@@ -32,12 +48,4 @@ window.addEventListener('scroll', function() {
 	}, 66);
 }, false);
 <?php endif; ?>
-fetch(url).then(res => res.arrayBuffer()).then(arrayBuffer => {
-	var td = new TextDecoder("windows-1251");
-	var htm = td.decode(arrayBuffer);
-	document.getElementById("reader").insertAdjacentHTML('beforeend', htm);
-<?php if ($current_user_id > 0 && $savedPos > 0): ?>
-	window.scrollTo(0, document.body.scrollHeight / 100 * <?= $savedPos ?>);
-<?php endif; ?>
-});
 </script>

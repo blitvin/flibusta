@@ -9,6 +9,22 @@ function h($s) {
 }
 
 /**
+ * Plain text to paragraphs.
+ *
+ * The input is the contents of a book file, i.e. untrusted, so each line is
+ * escaped: markup inside a .txt must read as text rather than render.
+ */
+function nl2p($string) {
+	$paragraphs = '';
+	foreach (explode("\n", (string)$string) as $line) {
+		if (trim($line)) {
+			$paragraphs .= '<p>' . htmlspecialchars($line, ENT_QUOTES, 'UTF-8') . '</p>';
+		}
+	}
+	return $paragraphs;
+}
+
+/**
  * Format a libbook.time value as Y-m-d.
  * Dump rows carry second precision ('2011-05-11 20:19:21+00'), but a row
  * inserted with the column default (CURRENT_TIMESTAMP) carries microseconds,
@@ -1247,6 +1263,58 @@ function fetchMissingBook(int $id, string $ext): ?string {
 		flock($lockFh, LOCK_UN);
 		fclose($lockFh);
 	}
+}
+
+/**
+ * Locate a book's file and make it readable.
+ *
+ * Resolves the outer archive from book_zip, pre-extracts a one-book inner zip
+ * into LOCAL_LIBRARY_PATH and falls back to downloading from the mirror, so
+ * that afterwards the caller can read either LOCAL_LIBRARY_PATH<id>.<ext> or
+ * the returned open ZipArchive. This is the lookup that modules/book/index.php
+ * used to carry twice (once per branch) and that the /book/content route needs
+ * as well.
+ *
+ * Returns null when the book cannot be located at all, otherwise
+ * ['status' => 'ok'|'archive_error', 'zip' => ZipArchive|null, 'dbFilename' => ?string].
+ */
+function book_open_source($dbh, int $id, string $ext): ?array {
+	// Literal, not a bound parameter, so the query keeps the exact shape it had
+	// before: with EMULATE_PREPARES off, Postgres infers the type of the single
+	// placeholder from the BETWEEN comparison.
+	$usr = ($ext === 'fb2') ? '0' : '1';
+	$stmt = $dbh->prepare("SELECT filename FROM book_zip WHERE ? BETWEEN start_id AND end_id AND usr=$usr");
+	$stmt->execute([$id]);
+	$zipRow = $stmt->fetch();
+
+	$fnStmt = $dbh->prepare("SELECT filename FROM libfilename WHERE BookId = ?");
+	$fnStmt->execute([$id]);
+	$fnRow = $fnStmt->fetch();
+	$dbFilename = $fnRow ? $fnRow->filename : null;
+
+	if (!$zipRow) {
+		// Not covered by any local archive — try the configured mirror. The
+		// renderers then read the downloaded file from LOCAL_LIBRARY_PATH, so an
+		// unopened ZipArchive is handed back, exactly as this branch did before.
+		if (fetchMissingBook($id, $ext) === null) {
+			return null;
+		}
+		return ['status' => 'ok', 'zip' => null, 'dbFilename' => $dbFilename];
+	}
+
+	// Pre-extract any inner zip so the file is ready in LOCAL_LIBRARY_PATH before
+	// it is needed. libfilename may hold the real name (e.g. Olga_Gromyiko.fb2.zip).
+	$innerZipName = ($dbFilename && strtolower(pathinfo($dbFilename, PATHINFO_EXTENSION)) === 'zip')
+		? $dbFilename
+		: $id . '.' . $ext . '.zip';
+	resolve_inner_zip_book($zipRow->filename, $id, $innerZipName, $ext);
+
+	$zip = new ZipArchive();
+	if ($zip->open($zipRow->filename) !== true) {
+		error_log("book_open_source: cannot open archive {$zipRow->filename} for book $id");
+		return ['status' => 'archive_error', 'zip' => null, 'dbFilename' => $dbFilename];
+	}
+	return ['status' => 'ok', 'zip' => $zip, 'dbFilename' => $dbFilename];
 }
 
 function resolve_inner_zip_book(string $outerZipPath, int $bookId, string $innerZipName, string $ext): ?string {

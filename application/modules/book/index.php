@@ -1,16 +1,6 @@
 <?php
 echo "<script>var url = '$webroot/usr.php?id=$url->var1';</script>";
 
-function nl2p($string) {
-    $paragraphs = '';
-    foreach (explode("\n", $string) as $line) {
-        if (trim($line)) {
-            $paragraphs .= '<p>' . $line . '</p>';
-        }
-    }
-    return $paragraphs;
-}
-
 // Determine view mode: URL selector overrides preference; fallback is contentonly
 $_selector = $url->var2_str ?? '';
 if (in_array($_selector, ['withannotation', 'contentonly'], true)) {
@@ -55,119 +45,68 @@ if ($view_mode === 'withannotation') {
 }
 
 
-function str_replace_first($from, $to, $content) {
-    $from = '/'.preg_quote($from, '/').'/';
-    return preg_replace($from, $to, $content, 1);
-}
-
-
 $ext = strtolower(trim($book->filetype));
 
-if ($ext == 'fb2') {
-	$stmt = $dbh->prepare("SELECT * FROM book_zip WHERE ? BETWEEN start_id AND end_id AND usr=0");
-} else {
-	$stmt = $dbh->prepare("SELECT * FROM book_zip WHERE ? BETWEEN start_id AND end_id AND usr=1");
-}
-$stmt->execute([$url->var1]);
-if ($stmt->rowCount() >0 ){
-	$zip_name = $stmt->fetch()->filename;
-	$zip = new ZipArchive();
+// Formats whose content is the book's own markup are rendered by
+// /book/content/<id> and framed in a sandbox, so that a <script> or an
+// onerror= handler inside a book file cannot run with the reader's session.
+// The rest are drawn by a JS library from the binary file (canvas for pdf/djvu,
+// generated DOM for docx/rtf) or bring their own isolation (epub.js).
+$framed_formats = ['fb2', 'txt', 'html', 'htm'];
 
-	// Pre-extract any inner zip so the file is ready in /cache/local/ before it is needed:
-	// - non-fb2 (pdf/epub/djvu/…): JS viewers fetch via usr.php after the page loads
-	// - fb2: fb.php reads from /cache/local/ when available (see fb.php)
-	// Determine the correct inner zip name: libfilename may store the actual name (e.g. Olga_Gromyiko_Grom.fb2.zip)
-	$fnStmt = $dbh->prepare("SELECT filename FROM libfilename WHERE BookId = ?");
-	$fnStmt->execute([$url->var1]);
-	$fnRow = $fnStmt->fetch();
-	$dbFilename = $fnRow ? $fnRow->filename : null;
-	if ($dbFilename && strtolower(pathinfo($dbFilename, PATHINFO_EXTENSION)) === 'zip') {
-		$innerZipName = $dbFilename;
-	} else {
-		$innerZipName = intval($url->var1) . '.' . $ext . '.zip';
-	}
-	resolve_inner_zip_book($zip_name, intval($url->var1), $innerZipName, $ext);
+// Formats that scroll the page and store a percentage in `progress`.
+// epub and djvu keep their own position handling (CFI / page number).
+$progress_formats = ['fb2', 'txt', 'html', 'htm', 'mobi', 'docx', 'rtf'];
 
-	echo "<div id='reader' class='reader'>";
-	if ($zip->open($zip_name) === TRUE) {
-		if ($ext == 'fb2') {
-			include('fb.php');
-		}
-
-		if ($ext == 'txt') {
-			include('txt.php');
-		}
-
-		if ($ext == 'epub') {
-			include('epub.php');
-		}
-
-		if ($ext == 'pdf') {
-			include('pdf.php');
-		}
-
-		if ($ext == 'mobi') {
-			include('mobi.php');
-		}
-
-		if (($ext == 'djvu') || ($ext == 'djv')) {
-			include('djvu.php');
-		}
-
-		if ($ext == 'rtf') {
-			include('rtf.php');
-		}
-
-		if ($ext == 'docx') {
-			include('docx.php');
-		}
-
-		if (($ext == 'html') || ($ext == 'htm')) {
-			include('html.php');
-		}
-
-		$zip->close();
-	} else {
-		echo "<p><b><center> Не удалось открыть архив $zip_name ,Ошибка ".$zip->getStatusString()."</center></b></p>\n";
-	}
-} else {
-	$localPath = fetchMissingBook(intval($url->var1), $ext);
-	if ($localPath !== null) {
-		$zip = new ZipArchive();
-		echo "<div id='reader' class='reader'>";
-		if ($ext == 'fb2') {
-			include('fb.php');
-		}
-		if ($ext == 'txt') {
-			include('txt.php');
-		}
-		if ($ext == 'epub') {
-			include('epub.php');
-		}
-		if ($ext == 'pdf') {
-			include('pdf.php');
-		}
-		if ($ext == 'mobi') {
-			include('mobi.php');
-		}
-		if (($ext == 'djvu') || ($ext == 'djv')) {
-			include('djvu.php');
-		}
-		if ($ext == 'rtf') {
-			include('rtf.php');
-		}
-		if ($ext == 'docx') {
-			include('docx.php');
-		}
-		if (($ext == 'html') || ($ext == 'htm')) {
-			include('html.php');
-		}
-		echo "</div>";
-	} else {
-		echo "<p><b><center>Не удалось открыть книгу № ". $url->var1 . " , вероятно zip файл с книгой отсутсвует</center></b></p>\n";
-	}
+if (in_array($ext, $progress_formats, true)) {
+    include('position.php');
 }
 
+if (in_array($ext, $framed_formats, true)) {
+    echo "<script src='$webroot/js/bookframe.js'></script>";
+    echo "<iframe id='bookframe' class='bookframe' src='$webroot/book/content/$_bid'"
+       . " sandbox='allow-same-origin allow-popups allow-popups-to-escape-sandbox'"
+       . " referrerpolicy='no-referrer' title='"
+       . htmlspecialchars($book->title, ENT_QUOTES, 'UTF-8') . "'></iframe>";
+} else {
+    // Resolves the archive, pre-extracts an inner zip and falls back to the
+    // mirror, so the file is on disk before the viewer requests it via usr.php.
+    $src = book_open_source($dbh, $_bid, $ext);
+    if ($src === null) {
+        echo "<p><b><center>Не удалось открыть книгу № " . $_bid . " , вероятно zip файл с книгой отсутсвует</center></b></p>\n";
+    } elseif ($src['status'] !== 'ok') {
+        // The archive path is server-side detail; book_open_source() logged it.
+        echo "<p><b><center>Не удалось открыть архив с книгой</center></b></p>\n";
+    } else {
+        if ($src['zip'] !== null) {
+            $src['zip']->close();
+        }
+        echo "<div id='reader' class='reader'>";
 
-?>
-</div>
+        if ($ext == 'epub') {
+            include('epub.php');
+        }
+
+        if ($ext == 'pdf') {
+            include('pdf.php');
+        }
+
+        if ($ext == 'mobi') {
+            include('mobi.php');
+        }
+
+        if (($ext == 'djvu') || ($ext == 'djv')) {
+            include('djvu.php');
+        }
+
+        if ($ext == 'rtf') {
+            include('rtf.php');
+        }
+
+        if ($ext == 'docx') {
+            include('docx.php');
+        }
+
+        echo "</div>";
+    }
+}

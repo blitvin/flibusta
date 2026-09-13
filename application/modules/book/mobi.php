@@ -1,41 +1,44 @@
 <?php
-$current_user_id = isset($_SESSION['user_id']) ? intval($_SESSION['user_id']) : 0;
-$savedPos = 0;
-$savePositionUrlPrefix = '';
-if ($current_user_id > 0) {
-	$savePositionUrl = $webroot . '/save_position.php';
-	$saveBookId      = (int)$url->var1;
-	$saveCsrf        = get_csrf_token();
-	$stmt = $dbh->prepare("SELECT pos FROM progress WHERE user_id=:uid AND bookid=:id LIMIT 1");
-	$stmt->bindParam(":uid", $current_user_id);
-	$stmt->bindParam(":id", $url->var1);
-	$stmt->execute();
-	if ($p = $stmt->fetch()) {
-		$savedPos = (float)($p->pos ?? 0);
-	}
-}
-echo "<script src='$webroot/js/mobi.min.js'></script>\n"; ?>
+// mobi.min.js turns the book into HTML and its render_to() injects that straight
+// into a live element. The markup is the book's own, i.e. untrusted, so it goes
+// into the sandboxed frame instead: the two halves render_to() performs —
+// read_text() for the markup and render_image() for the embedded images — are
+// driven here against the frame's document.
+//
+// The scroll position script comes from position.php, included by index.php.
+echo "<script src='$webroot/js/mobi.min.js'></script>\n";
+?>
+<iframe id="bookframe" class="bookframe"
+	sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
+	referrerpolicy="no-referrer"></iframe>
+<?php echo "<script src='$webroot/js/bookframe.js'></script>\n"; ?>
 <script>
-<?php if ($current_user_id > 0): ?>
-var isScrolling;
-var savePositionUrl = <?= json_encode($savePositionUrl, JSON_UNESCAPED_SLASHES) ?>;
-var saveBookId = <?= (int)$saveBookId ?>;
-var saveCsrf = <?= json_encode($saveCsrf) ?>;
-window.addEventListener('scroll', function() {
-	window.clearTimeout(isScrolling);
-	isScrolling = setTimeout(function() {
-		var pos = 100 / document.body.scrollHeight * window.scrollY;
-		var x = new XMLHttpRequest();
-		x.open("POST", savePositionUrl, true);
-		x.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
-		x.send("bookid=" + encodeURIComponent(saveBookId) + "&pos=" + encodeURIComponent(pos) + "&csrf_token=" + encodeURIComponent(saveCsrf));
-	}, 66);
-}, false);
-<?php endif; ?>
+var bookFrameCss = <?= json_encode($webroot . '/css/style.css', JSON_UNESCAPED_SLASHES) ?>;
+
 fetch(url).then(res => res.arrayBuffer()).then(arrayBuffer => {
-	new MobiFile(arrayBuffer).render_to("reader");
-<?php if ($current_user_id > 0 && $savedPos > 0): ?>
-	window.scrollTo(0, document.body.scrollHeight / 100 * <?= $savedPos ?>);
-<?php endif; ?>
+	var mobi = new MobiFile(arrayBuffer);
+	mobi.load();
+
+	var frame = document.getElementById('bookframe');
+	// Images are palm records, not URLs, so they can only be filled in after the
+	// frame has parsed the markup.
+	frame.addEventListener('load', function () {
+		var doc = frame.contentDocument;
+		if (!doc) {
+			return;
+		}
+		var images = doc.getElementsByTagName('img');
+		for (var i = 0; i < images.length; i++) {
+			mobi.render_image(images, i);
+		}
+	});
+
+	frame.srcdoc = '<!doctype html><html lang="ru"><head><meta charset="utf-8">'
+		+ '<meta name="viewport" content="width=device-width, initial-scale=1">'
+		+ '<base target="_blank">'
+		+ '<link rel="stylesheet" href="' + bookFrameCss + '">'
+		+ '<style>body{margin:0;padding:0 .3rem;background:#fff}'
+		+ 'img{max-width:100%;height:auto}</style>'
+		+ '</head><body class="reader">' + mobi.read_text() + '</body></html>';
 });
 </script>
