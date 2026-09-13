@@ -30,7 +30,9 @@ if ($url->mod !== 'service') {
 	} else {
 		$title = 'Библиотека';
 	}
-	echo "<title>$title</title>";
+	// $url->title is DB-origin for the book module (book/module.conf sets it from
+	// libbook.title), and "</title><script>" would break out of RCDATA.
+	echo "<title>" . htmlspecialchars($title, ENT_QUOTES, 'UTF-8') . "</title>";
 	include_once(ROOT_PATH . 'webroot.php');
 echo <<< __HTML
 

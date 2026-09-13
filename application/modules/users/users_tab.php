@@ -21,16 +21,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         die('CSRF validation failed.');
     }
 
+    // Authorization is read from $_SESSION['is_admin'], which is written once at
+    // log-in, so a role change only takes effect after a fresh log-in. Both
+    // directions must therefore drop the user's sessions — otherwise a demoted
+    // admin keeps /service, /users and /addbook for the life of the session,
+    // which is up to a year for a trusted-network client.
     if (isset($_POST['to_admin'])) {
         $user_id = $_POST['id'];
         $stmt = $dbh->prepare("UPDATE users SET is_admin = true WHERE id = ?");
         $stmt->execute([$user_id]);
+        invalidateUserSessions($dbh, $user_id);
     }
-    
+
     if (isset($_POST['to_regular_user'])) {
         $user_id = $_POST['id'];
         $stmt = $dbh->prepare("UPDATE users SET is_admin = false WHERE id = ?");
         $stmt->execute([$user_id]);
+        invalidateUserSessions($dbh, $user_id);
     }
     
     if (isset($_POST['delete_user'])) {

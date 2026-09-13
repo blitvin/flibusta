@@ -78,7 +78,7 @@ if ($current_user_id > 0) {
 			if (!empty($author->file)) {
 				echo "<img class='rounded-circle contact' src='$webroot/extract_author.php?id=$author->avtorid' />";
 			}
-			echo "<a class='mw-100 rounded-pill author' href='$webroot/author/view/$author->avtorid'>$author->lastname $author->firstname $author->middlename $author->nickname</a>";
+			echo "<a class='mw-100 rounded-pill author' href='$webroot/author/view/" . intval($author->avtorid) . "'>" . h("$author->lastname $author->firstname $author->middlename $author->nickname") . "</a>";
 			echo "</div>";
 			echo "<form method='POST' action='' class='ms-2'>
 				<input type='hidden' name='action' value='unfav_author' />
@@ -96,7 +96,7 @@ if ($current_user_id > 0) {
 		echo "<div class='card mb-3'><div class='card-body'>";
 		foreach ($user_series as $series) {
 			echo "<div class='d-flex align-items-center justify-content-between mb-2'>";
-			echo "<a class='mw-100 text-dark' href='$webroot/?sid=$series->seqid'>$series->seqname</a>";
+			echo "<a class='mw-100 text-dark' href='$webroot/?sid=" . intval($series->seqid) . "'>" . h($series->seqname) . "</a>";
 			echo "<form method='POST' action='' class='ms-2'>
 				<input type='hidden' name='action' value='unfav_seq' />
 				<input type='hidden' name='id' value='$series->seqid' />
@@ -153,12 +153,12 @@ while ($list = $lists->fetch()) {
 
 	echo "<div class='card mb-3'>";
 	echo "<div class='card-header d-flex justify-content-between align-items-center'>";
-	echo "<div><strong>$list->name</strong></div>";
+	echo "<div><strong>" . h($list->name) . "</strong></div>";
 	echo "<div class='d-flex gap-2'>";
 	if ($current_user_id > 0) {
 		echo "<form method='POST' action=''>
 			<input type='hidden' name='local_action' value='import_uuid' />
-			<input type='hidden' name='list_uuid' value='$list->list_uuid' />
+			<input type='hidden' name='list_uuid' value='" . h($list->list_uuid) . "' />
 			<input type='hidden' name='csrf_token' value='" . htmlspecialchars(get_csrf_token()) . "' />
 			<button type='submit' class='btn btn-sm btn-outline-primary'>Импортировать</button>
 		</form>";
@@ -166,7 +166,7 @@ while ($list = $lists->fetch()) {
 	if ($is_admin) {
 		echo "<form method='POST' action=''>
 			<input type='hidden' name='local_action' value='delete_uuid' />
-			<input type='hidden' name='list_uuid' value='$list->list_uuid' />
+			<input type='hidden' name='list_uuid' value='" . h($list->list_uuid) . "' />
 			<input type='hidden' name='csrf_token' value='" . htmlspecialchars(get_csrf_token()) . "' />
 			<button type='submit' class='btn btn-sm btn-outline-danger'>Удалить список</button>
 		</form>";
@@ -191,7 +191,7 @@ while ($list = $lists->fetch()) {
 			if (!empty($author->file)) {
 				echo "<img class='rounded-circle contact' src='$webroot/extract_author.php?id=$author->avtorid' />";
 			}
-			echo "<a class='mw-100 rounded-pill author' href='$webroot/author/view/$author->avtorid'>$author->lastname $author->firstname $author->middlename $author->nickname</a>";
+			echo "<a class='mw-100 rounded-pill author' href='$webroot/author/view/" . intval($author->avtorid) . "'>" . h("$author->lastname $author->firstname $author->middlename $author->nickname") . "</a>";
 			echo "</div>";
 		}
 	}
@@ -199,7 +199,7 @@ while ($list = $lists->fetch()) {
 	if (!empty($legacy_series)) {
 		echo "<h6 class='mb-2 mt-2'>Серии</h6>";
 		foreach ($legacy_series as $series) {
-			echo "<div class='mb-2'><a class='mw-100 text-dark' href='$webroot/?sid=$series->seqid'>$series->seqname</a></div>";
+			echo "<div class='mb-2'><a class='mw-100 text-dark' href='$webroot/?sid=" . intval($series->seqid) . "'>" . h($series->seqname) . "</a></div>";
 		}
 	}
 	echo "</div>";

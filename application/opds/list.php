@@ -2,6 +2,8 @@
 header('Content-Type: application/atom+xml; charset=utf-8');
 echo '<?xml version="1.0" encoding="utf-8"?>';
 
+$x = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES | ENT_XML1, 'UTF-8');
+
 $filter = "deleted='0' ";
 $join = '';
 $orderby = ' time DESC ';
@@ -18,7 +20,7 @@ if (isset($_GET['genre_id'])) {
 	$stmt->bindParam(":gid", $gid);
 	$stmt->execute();
 	$g = $stmt->fetch();
-	$title = "в $g->genremeta: $g->genredesc";
+	$title = "в " . $x($g->genremeta) . ": " . $x($g->genredesc);
 	$urlParams[] = 'genre_id=' . $gid;
 }
 
@@ -32,7 +34,7 @@ if (isset($_GET['seq_id'])) {
 	$stmt->bindParam(":sid", $sid);
 	$stmt->execute();
 	$s = $stmt->fetch();
-	$title = "в сборнике $s->seqname";
+	$title = "в сборнике " . $x($s->seqname);
 	$urlParams[] = 'seq_id=' . $sid;
 }
 
@@ -57,8 +59,9 @@ if (isset($_GET['author_id'])) {
 	$stmt->bindParam(":aid", $aid);
 	$stmt->execute();
 	$a = $stmt->fetch();
-	$title = ($a->nickname !='')?"$a->firstname $a->middlename $a->lastname ($a->nickname)"
-			:"$a->firstname  $a->middlename $a->lastname";
+	$title = ($a->nickname != '')
+		? $x("$a->firstname $a->middlename $a->lastname ($a->nickname)")
+		: $x("$a->firstname  $a->middlename $a->lastname");
 	$urlParams[] = 'author_id=' . $aid;
 	if ($display_type !== '') $urlParams[] = 'display_type=' . urlencode($display_type);
 }

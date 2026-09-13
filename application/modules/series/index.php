@@ -119,7 +119,7 @@ echo '<div class="row">';
 show_gpager(ceil($cnt / SERIES_PAGE), 5);
 while ($bs = $stmt->fetch()) {
 	if ($bs->cnt > 0) {
-		echo "<div class='col col-sm-6 mb-3 d-flex justify-content-between'><a class='mw-100 text-dark' href='$webroot/?sid=$bs->seqid'>$bs->seqname</a><span class='badge bg-secondary'>$bs->cnt</span></div>";
+		echo "<div class='col col-sm-6 mb-3 d-flex justify-content-between'><a class='mw-100 text-dark' href='$webroot/?sid=" . intval($bs->seqid) . "'>" . h($bs->seqname) . "</a><span class='badge bg-secondary'>" . intval($bs->cnt) . "</span></div>";
 	}
 }
 echo "</div>";

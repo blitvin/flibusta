@@ -78,9 +78,7 @@ function bbc2html($content) {
     '/(\[i\])(.*?)(\[\/i\])/',
     '/(\[u\])(.*?)(\[\/u\])/',
     '/(\[ul\])(.*?)(\[\/ul\])/',
-    '/(\[li\])(.*?)(\[\/li\])/',
-    '/(\[url=)(.*?)(\])(.*?)(\[\/url\])/',
-    '/(\[url\])(.*?)(\[\/url\])/'
+    '/(\[li\])(.*?)(\[\/li\])/'
   );
 
   $replace = array (
@@ -88,24 +86,35 @@ function bbc2html($content) {
     '<em>$2</em>',
     '<u>$2</u>',
     '<ul>$2</ul>',
-    '<li>$2</li>',
-    '<a href="$2" target="_blank">$4</a>',
-    '<a href="$2" target="_blank">$2</a>'
+    '<li>$2</li>'
   );
 
   $out = preg_replace($search, $replace, $content);
 
-  // M2: neutralise dangerous hrefs (javascript:, data:, etc.) produced by [url] tags.
-  $out = preg_replace_callback(
-    '/<a href="([^"]*)"/i',
-    function ($m) {
-      $href = html_entity_decode($m[1], ENT_QUOTES, 'UTF-8');
-      $scheme = strtolower(parse_url($href, PHP_URL_SCHEME) ?? '');
-      $ok = ($scheme === 'http' || $scheme === 'https' || $scheme === 'mailto' || $scheme === '');
-      return '<a href="' . ($ok ? h($href) : '#') . '"';
-    },
-    $out
-  );
+  // [url] tags build the whole anchor in a callback so the URL is validated and
+  // escaped BEFORE it becomes an attribute. Interpolating the captured URL
+  // straight into href="$2" let a crafted tag close the attribute and add its
+  // own, e.g. [url=" onmouseover="alert(1)]x[/url]; the sanitising post-pass
+  // that used to follow could not catch it because its [^"]* stopped at the
+  // injected quote, leaving the smuggled handler untouched.
+  $anchor = function ($href, $text) {
+    $href = html_entity_decode($href, ENT_QUOTES, 'UTF-8');
+    $scheme = strtolower(parse_url($href, PHP_URL_SCHEME) ?? '');
+    $ok = ($scheme === 'http' || $scheme === 'https' || $scheme === 'mailto' || $scheme === '');
+    return '<a href="' . ($ok ? h($href) : '#') . '" target="_blank">' . $text . '</a>';
+  };
+
+  // [url=URL]text[/url] — the link text keeps the allow-listed markup that
+  // sanitize_annotations.php already vetted, so it is not escaped again.
+  $out = preg_replace_callback('/\[url=(.*?)\](.*?)\[\/url\]/', function ($m) use ($anchor) {
+    return $anchor($m[1], $m[2]);
+  }, $out);
+
+  // [url]URL[/url] — the URL is also the link text, so it must be escaped.
+  $out = preg_replace_callback('/\[url\](.*?)\[\/url\]/', function ($m) use ($anchor) {
+    return $anchor($m[1], h($m[1]));
+  }, $out);
+
   return $out;
 }
 
@@ -941,6 +950,63 @@ function record_login_attempt($pdo, $username,  $outcome) {
 	}
 }
 
+/**
+ * Credentials carried by an HTTP Basic header, or [null, null].
+ * The split has a limit of 2 so that a password containing ':' survives.
+ */
+function basic_auth_credentials() {
+	$user = $_SERVER['PHP_AUTH_USER'] ?? null;
+	$pass = $_SERVER['PHP_AUTH_PW'] ?? null;
+
+	if (empty($user) && ! empty($_SERVER['HTTP_AUTHORIZATION'])) {
+		$auth = explode(':', base64_decode(substr($_SERVER['HTTP_AUTHORIZATION'], 6)), 2);
+		$user = $auth[0] ?? null;
+		$pass = $auth[1] ?? '';
+	}
+	return [$user, $pass];
+}
+
+/**
+ * True when this username or this client IP has too many recent failures.
+ * Records the lockout itself, exactly as the form login used to do inline.
+ *
+ * Shared by the form login and by every HTTP Basic entry point: without this,
+ * Basic auth (OPDS feeds and the direct file endpoints) would be an unthrottled
+ * password-guessing channel against the same hashes the form login protects.
+ */
+function login_attempts_blocked($pdo, $username) {
+	$stmt = $pdo->prepare("SELECT COUNT(*) cnt FROM login_attempts WHERE username = ? AND attempt_time > NOW() - INTERVAL '15 minutes' AND outcome > 0");
+	$stmt->execute([$username]);
+	$failed_count = $stmt->fetch();
+	if ($failed_count && ($failed_count->cnt > 10)) {
+		record_login_attempt($pdo, $username, LOGIN_LOCKED_FAILCOUNT);
+		return true;
+	}
+	$stmt = $pdo->prepare("SELECT COUNT(*) cnt FROM login_attempts WHERE ip_address = ? AND attempt_time > NOW() - INTERVAL '15 minutes' AND outcome > 0");
+	$stmt->execute([$_SERVER['REMOTE_ADDR']]);
+	$failed_count = $stmt->fetch();
+	if ($failed_count && ($failed_count->cnt > 5)) {
+		record_login_attempt($pdo, $username, LOGIN_IP_LOCKED);
+		return true;
+	}
+	return false;
+}
+
+/** Verify HTTP Basic credentials, honouring the lockout counters. */
+function basic_auth_ok($pdo, $user, $pass) {
+	if (empty($user) || empty($pass)) {
+		return false;
+	}
+	if (login_attempts_blocked($pdo, $user)) {
+		sleep(2);
+		return false;
+	}
+	$stmt = $pdo->prepare("SELECT password_hash FROM users WHERE username = ?");
+	$stmt->execute([$user]);
+	$userData = $stmt->fetch();
+	return $userData && password_verify($pass, $userData->password_hash);
+}
+
 function checkLogin($pdo, $minAdmin = false, $webroot= '') {
 	$userIp = $_SERVER['REMOTE_ADDR'];
 	if ((TRUSTED_NET != '')  && ipInNetwork($userIp,TRUSTED_NET) && !$minAdmin)
@@ -954,39 +1020,32 @@ function checkLogin($pdo, $minAdmin = false, $webroot= '') {
 		die("Session has been terminated for security reasons.");
 	}
 
-	if ($minAdmin && ($_SESSION['is_admin'] !== true )) {
-		record_login_attempt($pdo,$_SESSION['username'], LOGIN_ADMIN_ACCESS_ATTEMPT);
+	if ($minAdmin && empty($_SESSION['is_admin'])) {
+		record_login_attempt($pdo,$_SESSION['username'] ?? 'Not known', LOGIN_ADMIN_ACCESS_ATTEMPT);
 		http_response_code(401);
 		die("Access denied.");
 	}
-	if (isset($_SESSION['user_id'])) 
+	if (isset($_SESSION['user_id']))
 		return; // user is logged in , access grunted
 	if (checkRememberMe($pdo,$webroot)) {
 		return;
 	}
 	http_response_code(303); //redirect to login
 	header("Location: ". $webroot."/login.php");
+	// Stop here: without the exit the caller carried on and rendered the whole
+	// protected page into the redirect's body, so any client that does not
+	// follow redirects (curl, a feed reader, a scraper) read it in full.
+	exit;
 }
 
 function checkOPDSLogin($pdo) {
 	$userIp = $_SERVER['REMOTE_ADDR'];
 	if ((TRUSTED_NET != '')  && ipInNetwork($userIp,TRUSTED_NET))
 		return ;  // client on trusted network, access grunted
-	$user = $_SERVER['PHP_AUTH_USER'] ?? null;
-	$pass = $_SERVER['PHP_AUTH_PW'] ?? null;
 
-	if (empty($user) && ! empty($_SERVER['HTTP_AUTHORIZATION'])) {
-		$auth = explode(':', base64_decode(substr($_SERVER['HTTP_AUTHORIZATION'], 6)));
-		$user = $auth[0];
-		$pass = $auth[1] ?? '';
-	}
-	if ($user && $pass) {
-		$stmt = $pdo->prepare("SELECT id, password_hash FROM users where username=?");
-		$stmt->execute([$user]);
-		$userData = $stmt->fetch();
-
-		if ($userData && password_verify($pass,$userData->password_hash))
-			return;
+	[$user, $pass] = basic_auth_credentials();
+	if (basic_auth_ok($pdo, $user, $pass)) {
+		return;
 	}
 
 	if (empty($user)) {
@@ -994,7 +1053,7 @@ function checkOPDSLogin($pdo) {
 	} else {
 		record_login_attempt($pdo,$user, LOGIN_OPDS_BAD_PASSWORD);
 	}
-	
+
 	header('WWW-Authenticate: Basic realm="My OPDS Library"');
 	header('HTTP/1.0 401 Unauthorized');
 	echo "<xml version='1.0' encoding='UTF-8' ?>
@@ -1002,6 +1061,39 @@ function checkOPDSLogin($pdo) {
 		    <message>Authenitcation required</message>
 		  </error>";
 	exit;
+}
+
+/**
+ * Access check for the direct file endpoints — fb2.php, usr.php,
+ * extract_cover.php, extract_author.php. They are reached both by the browser
+ * (session cookie) and by OPDS readers following acquisition / thumbnail links
+ * (HTTP Basic), so accept either, plus the trusted network and a remember-me
+ * cookie. Dies with 401 when none applies.
+ *
+ * The caller must have started the session before calling this.
+ */
+function checkFileAccess($pdo, $webroot = '') {
+	if ((TRUSTED_NET != '') && ipInNetwork($_SERVER['REMOTE_ADDR'] ?? '', TRUSTED_NET)) {
+		return;
+	}
+	if (isset($_SESSION['user_id']) && intval($_SESSION['user_id']) > 0) {
+		return;
+	}
+	if (checkRememberMe($pdo, $webroot)) {
+		return;
+	}
+
+	[$user, $pass] = basic_auth_credentials();
+	if (basic_auth_ok($pdo, $user, $pass)) {
+		return;
+	}
+	if (! empty($user)) {
+		record_login_attempt($pdo, $user, LOGIN_OPDS_BAD_PASSWORD);
+	}
+
+	header('WWW-Authenticate: Basic realm="My OPDS Library"');
+	http_response_code(401);
+	die('Authentication required.');
 }
 
 function isAdminPath($url) {
@@ -1013,19 +1105,7 @@ function login($pdo, $username, $password, $webroot,$set_remember_me) {
 	if (rand(0,100) < 2) {
 		cleanupUserMgmtTables($pdo);
 	}
-	$stmt = $pdo->prepare("SELECT COUNT(*) cnt FROM login_attempts WHERE username =  ? and attempt_time > NOW() - INTERVAL '15 minutes' AND outcome > 0");
-	$stmt->execute([$username]);
-	$failed_count = $stmt->fetch();
-	if ($failed_count && ($failed_count->cnt> 10)) {
-		record_login_attempt($pdo, $username, LOGIN_LOCKED_FAILCOUNT);
-		sleep(2);
-		return false;
-	}
-	$stmt = $pdo->prepare("SELECT COUNT(*) cnt FROM login_attempts WHERE ip_address = ? AND attempt_time > NOW() - INTERVAL '15 minutes' AND outcome > 0");
-	$stmt->execute([$_SERVER['REMOTE_ADDR']]);
-	$failed_count = $stmt->fetch();
-	if ($failed_count && ($failed_count->cnt > 5)) {
-		record_login_attempt($pdo, $username, LOGIN_IP_LOCKED);
+	if (login_attempts_blocked($pdo, $username)) {
 		sleep(2);
 		return false;
 	}
@@ -1164,7 +1244,10 @@ function checkRememberMe($pdo, $webroot) {
 		WHERE t.selector = ? AND t.expires_at > NOW()");
 		$stmt->execute([$selector]);
 		$tokenData = $stmt->fetch();
-		if ($tokenData && hash_equals($tokenData['token_hash'], hash('sha256',$validator))) {
+		// NB: ATTR_DEFAULT_FETCH_MODE is FETCH_OBJ, so this row is an object —
+		// the old array access raised "Cannot use object of type stdClass as
+		// array" and made every remember-me login fail with a 500.
+		if ($tokenData && hash_equals($tokenData->token_hash, hash('sha256',$validator))) {
 			session_regenerate_id(true); // L1: prevent session fixation on remember-me login
 			$_SESSION['user_id'] = $tokenData->user_id;
 			$_SESSION['username'] = htmlspecialchars($tokenData->username);

@@ -1,12 +1,24 @@
 <?php
 // Таб просмотра токенов remember-me
 
-// Обработка удаления токена
-if (isset($_GET['delete_id'])) {
-    $delete_id = (int)$_GET['delete_id'];
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+$csrfToken = $_SESSION['csrf_token'];
+
+// Обработка удаления токена.
+// POST + CSRF, like the session tab: as a GET link any page the admin loaded —
+// including a book's own markup — could delete tokens by embedding the URL.
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_id'])) {
+    $postedToken = $_POST['csrf_token'] ?? '';
+    if (!is_string($postedToken) || !hash_equals($csrfToken, $postedToken)) {
+        http_response_code(403);
+        die('CSRF validation failed.');
+    }
+
+    $delete_id = (int)$_POST['delete_id'];
     $stmt = $dbh->prepare("DELETE FROM user_tokens WHERE id = ?");
     $stmt->execute([$delete_id]);
-    // Можно добавить сообщение об успешном удалении, но пока просто удаляем
 }
 
 echo "<h4>Токены remember-me</h4>";
@@ -20,13 +32,19 @@ if ($tokens) {
         $expires_at = htmlspecialchars($token->expires_at);
         $is_expired = strtotime($token->expires_at) < time();
         $expires_class = $is_expired ? 'text-danger' : '';
-        
+
         echo "<tr>";
         echo "<td>" . htmlspecialchars($token->id) . "</td>";
         echo "<td><code>" . htmlspecialchars($token->selector) . "</code></td>";
         echo "<td>" . htmlspecialchars($token->username) . "</td>";
         echo "<td class='$expires_class'>" . $expires_at . ($is_expired ? ' (истёк)' : '') . "</td>";
-        echo "<td><a class='btn btn-danger btn-sm' href='?tokens&delete_id=" . htmlspecialchars($token->id) . "' onclick='return confirm(\"Вы уверены, что хотите удалить этот токен?\");'>Удалить</a></td>";
+        echo "<td>";
+        echo "<form method='POST' action='?tokens' style='display:inline;' onsubmit='return confirm(\"Вы уверены, что хотите удалить этот токен?\");'>";
+        echo "<input type='hidden' name='csrf_token' value='" . htmlspecialchars($csrfToken) . "'>";
+        echo "<input type='hidden' name='delete_id' value='" . htmlspecialchars($token->id) . "'>";
+        echo "<button type='submit' class='btn btn-danger btn-sm'>Удалить</button>";
+        echo "</form>";
+        echo "</td>";
         echo "</tr>";
     }
     echo "</tbody></table>";

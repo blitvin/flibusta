@@ -135,8 +135,8 @@ while ($a = $stmt->fetch()) {
 		if ($a->file != '') {
 			echo "<img class='rounded-circle contact' src='$webroot/extract_author.php?id=$a->avtorid' />";	
 		}
-		echo "&nbsp;$a->lastname $a->firstname $a->middlename $a->nickname&nbsp;</a>";
-		echo "<div class='badge bg-secondary'>$a->cnt</div>";
+		echo "&nbsp;" . h("$a->lastname $a->firstname $a->middlename $a->nickname") . "&nbsp;</a>";
+		echo "<div class='badge bg-secondary'>" . intval($a->cnt) . "</div>";
 		echo "</div>";
 
 	}

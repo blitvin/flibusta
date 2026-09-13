@@ -9,8 +9,16 @@ $error = '';
 $username = '';
 $remember = false;
 
+// login() calls session_regenerate_id(true), which keeps the session data, so
+// the token issued here stays valid across a successful log-in.
+$csrfToken = get_csrf_token();
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (login($dbh, $_POST['username'], $_POST['password'], $webroot, !empty($_POST['rememberMe']))) {
+    if (!validate_csrf_token($_POST['csrf_token'] ?? '')) {
+        // Without this an attacker could log a victim into an account they
+        // control and watch what the victim then does with it.
+        $error = "Сессия формы устарела. Обновите страницу и попробуйте снова.";
+    } elseif (login($dbh, $_POST['username'] ?? '', $_POST['password'] ?? '', $webroot, !empty($_POST['rememberMe']))) {
         $location = get_login_redirect($dbh, $_SESSION['user_id'], $webroot);
         header("Location: $location");
         http_response_code(303);
@@ -50,6 +58,8 @@ body {
                         <div class="alert alert-danger py-2"><?= htmlspecialchars($error, ENT_QUOTES, 'UTF-8') ?></div>
                     <?php endif; ?>
                     <form method="post" action="login.php">
+                        <input type="hidden" name="csrf_token"
+                               value="<?= htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8') ?>">
                         <div class="mb-3">
                             <label for="username" class="form-label fw-semibold">Имя пользователя</label>
                             <input id="username" type="text" name="username" class="form-control" required

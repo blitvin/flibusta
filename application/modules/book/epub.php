@@ -18,6 +18,22 @@ echo "<script src='$webroot/js/epub.min.js'></script>";
 ?>
 <script>
 const book = ePub({ replacements: 'blobUrl' });
+
+// Books come from an untrusted source (Flibusta dumps), so epub.js renders every
+// chapter into an iframe sandboxed with "allow-same-origin" only — Chrome therefore
+// refuses to run any <script> the book carries and logs "Blocked script execution in
+// 'about:srcdoc'". Drop those scripts while the chapter is still a DOM document, before
+// it is serialized into the iframe: the rendered text is unchanged, the console stays
+// clean, and the sandbox is not weakened (do NOT pass allowScriptedContent: true here —
+// allow-scripts together with allow-same-origin lets book content escape the sandbox).
+book.spine.hooks.content.register(function (doc) {
+	if (!doc || !doc.querySelectorAll) return;
+	var scripts = doc.querySelectorAll('script');
+	for (var i = scripts.length - 1; i >= 0; i--) {
+		if (scripts[i].parentNode) scripts[i].parentNode.removeChild(scripts[i]);
+	}
+});
+
 book.open(url, 'epub');
 var r = book.renderTo(document.body, {
 	flow: "scrolled-doc",

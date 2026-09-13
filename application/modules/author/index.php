@@ -87,7 +87,7 @@ echo "<div class='tab-content' id='authorTabsContent'>";
 if ($has_about) {
 	echo "<div class='tab-pane fade " . $pane_cls('about') . "' id='about' role='tabpanel' aria-labelledby='about-tab'>";
 	foreach ($annotations as $an) {
-		echo "$an->title<br />";
+		echo htmlspecialchars((string)$an->title, ENT_QUOTES, 'UTF-8') . "<br />";
 		echo "<p>", bbc2html(nl2br($an->body)), "</p>";
 	}
 	echo "</div>";

@@ -26,7 +26,7 @@ while ($bg = $stmt->fetch()) {
 	echo "<div class='col-sm-6 mb-3'>";
 	echo "<div class='card'>";
 
-	echo "<div class='card-header'><h3>$bg->genremeta</h3></div>";
+	echo "<div class='card-header'><h3>" . h($bg->genremeta) . "</h3></div>";
 
 	echo "<div class='card-body'>";
 
@@ -39,9 +39,9 @@ while ($bg = $stmt->fetch()) {
 	$st2->execute();
 	while ($g = $st2->fetch()) {	
 		echo "<div class='mb-1'>";
-		echo "<a class='btn btn-outline-primary btn-sm' href='$webroot/?gid=$g->genreid/'>$g->genredesc</a> ";
-		echo "<a class='btn btn-outline-danger btn-sm' href='$webroot/?xgid=$g->genreid'>Исключить</a>";
-	        echo "<span class='float-sm-end'>$g->cnt</span></div>";
+		echo "<a class='btn btn-outline-primary btn-sm' href='$webroot/?gid=" . intval($g->genreid) . "/'>" . h($g->genredesc) . "</a> ";
+		echo "<a class='btn btn-outline-danger btn-sm' href='$webroot/?xgid=" . intval($g->genreid) . "'>Исключить</a>";
+	        echo "<span class='float-sm-end'>" . intval($g->cnt) . "</span></div>";
 	}
 	
 	echo "</div>";

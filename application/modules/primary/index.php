@@ -122,7 +122,7 @@ if (isset($_SESSION['filter_author'])) {
 	if ($a->file != '') {
 		$fcontent .= "<img class='rounded-circle contact' src='$webroot/extract_author.php?id=$a->avtorid' />";
 	}
-	$fcontent .= "<a href='$webroot/?aid'>$a->lastname $a->firstname $a->middlename $a->nickname</a> <i class='fas fa-times-circle'></i></div> ";
+	$fcontent .= "<a href='$webroot/?aid'>" . h("$a->lastname $a->firstname $a->middlename $a->nickname") . "</a> <i class='fas fa-times-circle'></i></div> ";
 }
 
 if (isset($_SESSION['filter_genre'])) {
@@ -135,7 +135,7 @@ if (isset($_SESSION['filter_genre'])) {
 	$g = $stmt->fetch();
 
 	$fcontent .= "<div class='badge bg-success p-1 text-white'>";
-	$fcontent .= "<a class='text-white' href='$webroot/?xgid=$g->genreid'>$g->genremeta: $g->genredesc <i class='fas fa-times-circle'></i></a></div> ";
+	$fcontent .= "<a class='text-white' href='$webroot/?xgid=" . intval($g->genreid) . "'>" . h($g->genremeta) . ": " . h($g->genredesc) . " <i class='fas fa-times-circle'></i></a></div> ";
 }
 
 if (isset($_SESSION['filter_xgenre'])) {
@@ -150,7 +150,7 @@ if (isset($_SESSION['filter_xgenre'])) {
 	$xg = $stmt->fetch();
 
 	$fcontent .= "<div class='badge bg-secondary p-1 text-white'>";
-	$fcontent .= "<a style='text-decoration: line-through;' class='text-white' href='$webroot/?xgid'>$xg->genremeta: $xg->genredesc <i class='fas fa-times-circle'></i></a></div> ";
+	$fcontent .= "<a style='text-decoration: line-through;' class='text-white' href='$webroot/?xgid'>" . h($xg->genremeta) . ": " . h($xg->genredesc) . " <i class='fas fa-times-circle'></i></a></div> ";
 }
 
 if ($xgenres_active) {
@@ -185,7 +185,7 @@ if (isset($_SESSION['filter_series'])) {
 	$s = $stmt->fetch();
 
 	$fcontent .= "<div class='badge bg-danger p-1 text-white'>";
-	$fcontent .= "<a class='text-white' href='$webroot/?sid'>$s->seqname <i class='fas fa-times-circle'></i></a></div> ";
+	$fcontent .= "<a class='text-white' href='$webroot/?sid'>" . h($s->seqname) . " <i class='fas fa-times-circle'></i></a></div> ";
 	$order = "s.seqnumb, $order";
 	$seqname = $s->seqname;
 	$seqid = $_SESSION['filter_series'];
@@ -211,9 +211,9 @@ if (isset($_SESSION['filter_series']) && isset($_SESSION['user_id'])) {
 	$csrf_token = isset($_SESSION['csrf_token']) ? htmlspecialchars($_SESSION['csrf_token']) : '';
 	$fcontent .= "<form method='POST' action='' style='display:inline;' class='float-end'>
 		<input type='hidden' name='action' value='fav_seq' />
-		<input type='hidden' name='id' value='$seqid' />
+		<input type='hidden' name='id' value='" . intval($seqid) . "' />
 		<input type='hidden' name='csrf_token' value='$csrf_token' />
-		<button type='submit' class='btn btn-sm btn-info'>$seqname в Избранное</button>
+		<button type='submit' class='btn btn-sm btn-info'>" . h($seqname) . " в Избранное</button>
 	</form> ";
 }
 
@@ -272,8 +272,10 @@ try {
 	$protocol = (isset($_SERVER['SERVER_PROTOCOL']) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0');
         header($protocol . ' 504 Gateway Time-out');
 
+	// The driver message can carry the SQL text — log it, show a fixed message.
+	error_log('primary: book list query failed: ' . $e->getMessage());
 	echo "<div class='card m-3 border-danger'><div class='card-header bg-danger'>База данных</div><div class='card-body'>";
-	echo "<h3>" . $e->getMessage() . "</h3>";
+	echo "<h3>Не удалось выполнить запрос</h3>";
 	echo "<p>Попробуйте упростить параметры поиска, убрать часть тэгов, направленность. Сервер маленький ^^.</p>";
 	echo "</div></div>";
 }

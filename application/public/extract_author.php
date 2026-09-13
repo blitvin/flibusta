@@ -1,7 +1,12 @@
 <?php
 include('../init.php');
+session_start();
+// Author pictures are library content too — same access rule as the book endpoints.
+checkFileAccess($dbh, $webroot);
 $cover = '';
-header('Cache-Control: public, max-age=86400');
+// "private": the response now depends on who is asking, so only the requesting
+// browser may cache it — a shared cache would hand pictures to anonymous clients.
+header('Cache-Control: private, max-age=86400');
 
 function lastm($path) {
 	$fmtimestamp = filemtime($path);

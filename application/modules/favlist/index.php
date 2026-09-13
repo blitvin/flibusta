@@ -18,7 +18,7 @@ while ($a = $stmt->fetch()) {
 	echo "<div class='card mb-3'>";
 
 	echo "<div class='card-header'>";
-	echo "<a href='$webroot/fav/?login_uuid=$a->list_uuid'>$a->name</a>";
+	echo "<a href='$webroot/fav/?login_uuid=" . urlencode($a->list_uuid) . "'>" . h($a->name) . "</a>";
 	echo "</div>";
 
 	echo "<div class='card-body'>";
@@ -27,14 +27,14 @@ while ($a = $stmt->fetch()) {
 	$bs->execute();
 	$sta = $bs->fetch();
 	echo '<ul class="list-group list-group-horizontal">';
-	echo "<li class='list-group-item flex-fill'>Книг: $sta->bcnt</li>";
-	echo "<li class='list-group-item flex-fill'>Авторов: $sta->acnt</li>";
-	echo "<li class='list-group-item flex-fill'>Серий: $sta->scnt</li>";
+	echo "<li class='list-group-item flex-fill'>Книг: " . intval($sta->bcnt) . "</li>";
+	echo "<li class='list-group-item flex-fill'>Авторов: " . intval($sta->acnt) . "</li>";
+	echo "<li class='list-group-item flex-fill'>Серий: " . intval($sta->scnt) . "</li>";
 	echo "</ul>";
 	echo "</div>";
 
 	echo "<div class='card-footer'>";
-	echo "<a class='btn btn-danger btn-sm float-end' href='$webroot/favlist/?delete_uuid=$a->list_uuid'>Удалить</a>";
+	echo "<a class='btn btn-danger btn-sm float-end' href='$webroot/favlist/?delete_uuid=" . urlencode($a->list_uuid) . "'>Удалить</a>";
 	echo "</div>";
 
 	echo "</div>";

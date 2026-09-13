@@ -1,5 +1,8 @@
 <?php
 include('../init.php');
+session_start();
+// Covers are library content too — same access rule as the book endpoints.
+checkFileAccess($dbh, $webroot);
 $cover = '';
 $q = 75;
 
@@ -177,7 +180,9 @@ if (flock($filehandle,LOCK_SH|LOCK_NB) === false) {
 	die();
 }
 header("Content-type: image/jpeg");
-header('Cache-Control: public, max-age=86400');
+// "private": the response now depends on who is asking, so only the requesting
+// browser may cache it — a shared cache would hand covers to anonymous clients.
+header('Cache-Control: private, max-age=86400');
 if ($small) {
 	if (file_exists( CACHE_PATH . "covers/$id-small.jpg")) {
 		lastm( CACHE_PATH . "covers/$id-small.jpg");

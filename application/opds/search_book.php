@@ -31,10 +31,12 @@ $books = $dbh->prepare("SELECT DISTINCT BookId, libbook.Title as BookTitle,
 $books->bindParam(":q", $param);
 $books->execute();
 
+$x = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES | ENT_XML1, 'UTF-8');
+
 while ($b = $books->fetchObject()) {
 	echo " <entry> <updated>$cdt</updated>";
-	echo " <id>tag:book:$b->bookid</id>";
-	echo " <title>" . htmlspecialchars($b->booktitle) . "</title>";
+	echo " <id>tag:book:" . intval($b->bookid) . "</id>";
+	echo " <title>" . $x($b->booktitle) . "</title>";
 
 	$as = '';
 	$authors = $dbh->prepare("SELECT lastname, firstname, middlename FROM libavtorname, 
@@ -46,14 +48,15 @@ while ($b = $books->fetchObject()) {
 	}
 	$authors = null;
 
-	echo "<author> <name>$as</name>";
+	echo "<author> <name>" . $x($as) . "</name>";
 	echo " <uri>/a/id</uri>";
 	echo "</author>";
-	echo " <content type='text/html'>" . htmlspecialchars($b->body ?? '') . "</content>";
+	echo " <content type='text/html'>" . $x($b->body ?? '') . "</content>";
 
-	echo "<link rel='http://opds-spec.org/image/thumbnail' href='$webroot/extract_cover.php?id=$b->bookid' type='image/jpeg'/>";
-	echo "<link rel='http://opds-spec.org/image' href='$webroot/extract_cover.php?id=$b->bookid' type='image/jpeg'/>";
-	echo " <link href='$webroot/fb2.php?id=$b->bookid' rel='http://opds-spec.org/acquisition/open-access' type='application/fb2+zip' />";
+	$bidx = intval($b->bookid);
+	echo "<link rel='http://opds-spec.org/image/thumbnail' href='$webroot/extract_cover.php?id=$bidx' type='image/jpeg'/>";
+	echo "<link rel='http://opds-spec.org/image' href='$webroot/extract_cover.php?id=$bidx' type='image/jpeg'/>";
+	echo " <link href='$webroot/fb2.php?id=$bidx' rel='http://opds-spec.org/acquisition/open-access' type='application/fb2+zip' />";
 
 	echo "</entry>\n";
 }

@@ -8,6 +8,10 @@ if (isset($_GET['id']) && ctype_digit($_GET['id'])) {
 }
 error_reporting(E_ALL);
 include('../init.php');
+session_start();
+// Book files are behind the same log-in as the catalog pages: this endpoint is
+// reached directly (and from OPDS acquisition links), not only through index.php.
+checkFileAccess($dbh, $webroot);
 
 $stmt = $dbh->prepare("SELECT libbook.Title BookTitle, libfilename.filename, libbook.filetype,
 	CONCAT(libavtorname.LastName, ' ', libavtorname.FirstName) author_name
