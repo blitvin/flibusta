@@ -19,16 +19,17 @@ services:
            - FLIBUSTA_TRUSTED_NET='{адрес локальной сети в которой вы разрешаете пользоваться библиотекой без пароля , например 192.168.1.0/24}'
            - FLIBUSTA_URL=https://flibusta.is
            - FLIBUSTA_ENABLE_MISSING_BOOK_DOWNLOAD=true
-           # Redis - необязателен. Если FLIBUSTA_REDIS_HOST не задан, сессии
-           # хранятся в Postgres, а кэш просто выключен. Если задан, Redis должен
-           # быть доступен: при его недоступности сервер отвечает 503.
-           # Рекомендуемый запуск внешнего сервиса:
+           # Redis - необязателен, по умолчанию выключен. Пока FLIBUSTA_REDIS_HOST
+           # не задан, сессии хранятся в Postgres, а кэш не используется.
+           # Раскомментируйте строки ниже, ТОЛЬКО если у вас есть работающий Redis:
+           # после этого он становится обязательной зависимостью, и при его
+           # недоступности сервер отвечает 503. Подробности - в README.md.
            #   redis:alpine --save "" --appendonly no
            #                --maxmemory 128mb --maxmemory-policy volatile-lru
-           - FLIBUSTA_REDIS_HOST=flibusta-redis
-           - FLIBUSTA_REDIS_PORT=6379
-           - FLIBUSTA_REDIS_DB=0
-           - FLIBUSTA_REDIS_PREFIX=flibusta:
+           # - FLIBUSTA_REDIS_HOST=flibusta-redis
+           # - FLIBUSTA_REDIS_PORT=6379
+           # - FLIBUSTA_REDIS_DB=0
+           # - FLIBUSTA_REDIS_PREFIX=flibusta:
            # - FLIBUSTA_REDIS_PASSWORD_FILE=/run/secrets/FLIBUSTA_REDIS_PWD
         networks:
            flibusta_net:
