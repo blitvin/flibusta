@@ -16,6 +16,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 			$stmt->bindParam(':uid', $current_user_id);
 			$stmt->bindParam(':uuid', $import_uuid);
 			$stmt->execute();
+			user_favs_invalidate((int)$current_user_id);
 		}
 		if ($is_admin && $local_action === 'delete_uuid') {
 			$delete_uuid = $_POST['list_uuid'] ?? '';

@@ -25,16 +25,18 @@ $dsn = match($dbtype) {
 */
 $dsn = "pgsql:host=".$dbhost.";dbname=".$dbname.";options='--client_encoding=UTF8'";
 
-try {
-	$dbh = new PDO($dsn, $dbuser, $dbpasswd);
-	$dbh->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-	$dbh->setAttribute(PDO::ATTR_EMULATE_PREPARES, false);
-	$dbh->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_OBJ);
-} catch(Exception $e) {
-	// L3: never leak connection details (DSN/host) to output.
-	error_log('Flibusta DB connection failed: ' . $e->getMessage());
-	http_response_code(500);
-	die('Database temporarily unavailable.');
-}
+// __DIR__ rather than ROOT_PATH: the CLI tools (merge_local_books.php,
+// update_zip_list.php, sanitize_annotations.php) include this file directly,
+// without init.php having run.
+require_once __DIR__ . '/LazyPDO.php';
+
+// Nothing connects here any more - the first statement opens the connection, and
+// a failure there is reported exactly as it was reported from this spot before
+// (log the driver message, 500, generic text). See LazyPDO::fail().
+$dbh = new LazyPDO($dsn, $dbuser, $dbpasswd, [
+	PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
+	PDO::ATTR_EMULATE_PREPARES   => false,
+	PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_OBJ,
+]);
 
 ?>

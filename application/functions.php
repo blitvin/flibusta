@@ -244,11 +244,8 @@ function book_small_pg($book, $webroot='',$full = false) {
 	$fav_action = 'fav_book';
 	if ($current_user_id > 0) {
 		$show_fav_button = true;
-		$stmt = $dbh->prepare("SELECT COUNT(*) cnt FROM fav WHERE user_id=:uid AND bookid=:id");
-		$stmt->bindParam(":uid", $current_user_id);
-		$stmt->bindParam(":id", $book->bookid);
-		$stmt->execute();
-		if ($stmt->fetch()->cnt > 0) {
+		// One lookup for the whole list, not one query per card.
+		if (isset(user_favs($dbh, $current_user_id)['books'][intval($book->bookid)])) {
 			$fav = 'btn-primary';
 			$fav_action = 'unfav_book';
 		}
@@ -332,11 +329,7 @@ function book_info_pg($book, $webroot = '', $full = false) {
 	$fav = 'btn-outline-secondary';
 	$fav_action = 'fav_book';
 	if ($current_user_id > 0) {
-		$stmt = $dbh->prepare("SELECT COUNT(*) cnt FROM fav WHERE user_id=:uid AND bookid=:id");
-		$stmt->bindParam(":uid", $current_user_id);
-		$stmt->bindParam(":id", $book->bookid);
-		$stmt->execute();
-		if ($stmt->fetch()->cnt > 0) {
+		if (isset(user_favs($dbh, $current_user_id)['books'][intval($book->bookid)])) {
 			$fav = 'btn-primary';
 			$fav_action = 'unfav_book';
 		}
@@ -385,14 +378,11 @@ function book_info_pg($book, $webroot = '', $full = false) {
 	echo "</div>";
 
 	echo "</div><div class='col-sm-10'>";
+	// Authors, genres and series are library content, so they come from the cache
+	// in one go instead of three queries per book.
+	$header_lists = book_header_lists($dbh, intval($book->bookid));
 	echo "<div class='authors-list'>";
-	$stmt = $dbh->prepare("SELECT AvtorId, LastName, FirstName, nickname, middlename, File FROM libavtor a
-		LEFT JOIN libavtorname USING(AvtorId)
-		LEFT JOIN libapics USING(AvtorId)
-		WHERE a.BookId=:id");
-	$stmt->bindParam(":id", $book->bookid);
-	$stmt->execute();
-	while ($a = $stmt->fetch()) {
+	foreach ($header_lists['authors'] as $a) {
 		echo "<div class='badge rounded-pill author'>";
 		if ($a->file != '') {
 			echo "<img class='rounded-circle contact' src='$webroot/extract_author.php?id=$a->avtorid' />";	
@@ -404,23 +394,13 @@ function book_info_pg($book, $webroot = '', $full = false) {
 
 
 	echo "<div style='margin-bottom: 3px;'>";
-	$genres = $dbh->prepare("SELECT GenreId, GenreDesc FROM libgenre 
-		JOIN libgenrelist USING(GenreId)
-		WHERE BookId=:bookid");
-	$genres->bindParam(":bookid", $book->bookid);
-	$genres->execute();
-	while ($g = $genres->fetch()) {
+	foreach ($header_lists['genres'] as $g) {
 		echo "<a class='badge bg-success p-1 text-white' href='$webroot/?gid=" . intval($g->genreid) . "'>" . h($g->genredesc) . "</a> ";
 	}
 	echo "</div>";
-	
+
 	echo "<div style='margin-bottom: 3px;'>";
-	$seq = $dbh->prepare("SELECT SeqId, SeqName, SeqNumb FROM libseq
-				JOIN libseqname USING(SeqId)
-				WHERE BookId=:id");
-	$seq->bindParam(":id", $book->bookid);
-	$seq->execute();
-	while ($s = $seq->fetch()) {
+	foreach ($header_lists['series'] as $s) {
 		echo "<a class='badge bg-danger p-1 text-white' href='$webroot/?sid=" . intval($s->seqid) . "'>" . h($s->seqname) . " ";
 		if ($s->seqnumb > 0) {
 			echo " $s->seqnumb";
@@ -992,19 +972,115 @@ function login_attempts_blocked($pdo, $username) {
 	return false;
 }
 
-/** Verify HTTP Basic credentials, honouring the lockout counters. */
+/** How long a successfully verified Basic credential stays usable without a re-check. */
+define('AUTH_CACHE_TTL', 300);
+
+/**
+ * Cache key for a credential pair.
+ *
+ * Keyed by an HMAC under a secret that exists only in Redis, so the keyspace never
+ * reveals a username, let alone a password, and entries cannot be precomputed by
+ * anyone who can read the cache.
+ */
+function auth_cache_key(string $user, string $pass): string {
+	return 'auth:' . hash_hmac('sha256', $user . "\0" . $pass, cache_secret());
+}
+
+/** Remembers a verified credential, and notes it under the user so it can be revoked. */
+function auth_cache_store(string $key, int $userId, string $username, bool $isAdmin): void {
+	$r = cache_handle();
+	if ($r === null) {
+		return;
+	}
+	cache_set($key, ['user_id' => $userId, 'username' => $username, 'is_admin' => $isAdmin], AUTH_CACHE_TTL);
+	try {
+		$indexKey = 'auth:user:' . $userId;
+		$r->sAdd($indexKey, $key);
+		// Deliberately longer than the entries it tracks, refreshed on every add, so
+		// the index can never expire while a live entry still points at this user.
+		$r->expire($indexKey, AUTH_CACHE_TTL * 2);
+	} catch (Throwable $e) {
+		cache_failed($e);
+	}
+}
+
+/**
+ * Revokes every cached credential of a user. Must be called whenever the password,
+ * the role or the account itself changes - see user_security_changed().
+ */
+function auth_cache_invalidate_user(int $userId): void {
+	$r = cache_handle();
+	if ($r === null) {
+		return;
+	}
+	try {
+		$indexKey = 'auth:user:' . $userId;
+		$keys = $r->sMembers($indexKey);
+		if ($keys) {
+			$r->del($keys);
+		}
+		$r->del($indexKey);
+	} catch (Throwable $e) {
+		cache_failed($e);
+	}
+}
+
+/**
+ * Verify HTTP Basic credentials, honouring the lockout counters.
+ *
+ * OPDS readers send Basic auth on every single request and never keep a session,
+ * so this used to run two lockout COUNTs, a users lookup and a bcrypt verify for
+ * each feed page and each book an e-reader fetched. A verified pair is therefore
+ * remembered for AUTH_CACHE_TTL seconds.
+ *
+ * Only successes are cached, never failures, so the lockout counters still see
+ * every wrong password. The accepted trade-off is the other direction: a lockout
+ * that starts *after* a successful verification does not interrupt that client
+ * until its cached entry expires.
+ */
 function basic_auth_ok($pdo, $user, $pass) {
 	if (empty($user) || empty($pass)) {
 		return false;
+	}
+	$cacheKey = auth_cache_key((string)$user, (string)$pass);
+	if (cache_get($cacheKey) !== null) {
+		return true;
 	}
 	if (login_attempts_blocked($pdo, $user)) {
 		sleep(2);
 		return false;
 	}
-	$stmt = $pdo->prepare("SELECT password_hash FROM users WHERE username = ?");
+	$stmt = $pdo->prepare("SELECT id, username, is_admin, password_hash FROM users WHERE username = ?");
 	$stmt->execute([$user]);
 	$userData = $stmt->fetch();
-	return $userData && password_verify($pass, $userData->password_hash);
+	if ($userData && password_verify($pass, $userData->password_hash)) {
+		auth_cache_store($cacheKey, (int)$userData->id, (string)$userData->username, (bool)$userData->is_admin);
+		return true;
+	}
+	return false;
+}
+
+/**
+ * Everything that must be dropped when a user's password, role or account changes.
+ *
+ * Authorisation is decided from $_SESSION['is_admin'], written once at log-in, and
+ * from cached Basic credentials - so a demoted admin would otherwise keep /service,
+ * /users and /addbook for the life of a session, which is up to a year for a
+ * trusted-network client. Their cached preferences go too, since the account they
+ * describe may no longer exist.
+ *
+ * $keepSessionId spares one session: a user changing their own password stays
+ * logged in here while being logged out everywhere else.
+ */
+function user_security_changed(int $userId, ?string $keepSessionId = null): void {
+	if ($userId <= 0) {
+		return;
+	}
+	session_store()->deleteUserSessions($userId, $keepSessionId);
+	auth_cache_invalidate_user($userId);
+	cache_del("user:$userId:last_book");
+	user_prefs_invalidate($userId);
+	user_favs_invalidate($userId);
 }
 
 function checkLogin($pdo, $minAdmin = false, $webroot= '') {
@@ -1165,46 +1241,22 @@ function get_login_redirect($pdo, $user_id, $webroot) {
 /**
  * A user's personal hidden-genre list, as an array of ints.
  *
- * Read per request like every other user setting (author_default_tab,
- * book_view_mode, login_redirect) rather than cached in $_SESSION: sessions
- * are shared across tabs and live up to a year for trusted-network clients,
- * so a cached copy would go stale after a save on another device.
- * The static cache below is request-scoped only.
- *
- * The (int) cast is the single point of origin that makes it safe for callers
- * to inline these ids into an SQL IN (...) list.
+ * Now part of user_prefs(), which is read through the cache and dropped by every
+ * writer; still never kept in $_SESSION, where a per-device copy would go stale
+ * after a save somewhere else.
  */
 function get_excluded_genres($pdo, $user_id) {
-	static $cache = [];
-	$user_id = intval($user_id);
-	if ($user_id <= 0) {
-		return [];
-	}
-	if (isset($cache[$user_id])) {
-		return $cache[$user_id];
-	}
-	$out = [];
-	try {
-		$stmt = $pdo->prepare("SELECT genreid FROM user_excluded_genres WHERE user_id = ? ORDER BY genreid");
-		$stmt->execute([$user_id]);
-		while ($r = $stmt->fetch()) {
-			$out[] = (int)$r->genreid;
-		}
-	} catch (Exception $e) {
-		// Fail open: a broken preference must never break browsing.
-		error_log('Flibusta: excluded genres read failed: ' . $e->getMessage());
-		return [];
-	}
-	$cache[$user_id] = $out;
-	return $out;
+	return user_prefs($pdo, intval($user_id))->excluded_genres;
 }
 
 function cleanupUserMgmtTables($pdo) {
 	$pdo->query("DELETE FROM login_attempts  WHERE attempt_time < NOW() - INTERVAL '30 days'");
-	$pdo->query("DELETE FROM php_sessions WHERE last_accessed < NOW() - INTERVAL '2 days'");
+	// Session housekeeping belongs to whichever backend holds them. On Redis this
+	// only tidies index entries - expiry there is the TTL's job, and unlike this
+	// sweep it does not cut trusted-network sessions off after two days.
+	session_store()->deleteIdle(2 * 86400);
 	$pdo->query("DELETE FROM user_tokens WHERE expires_at < NOW()");
 	$pdo->query("VACUUM ANALYZE login_attempts");
-	$pdo->query("VACUUM ANALYZE php_sessions");
 	$pdo->query("VACUUM ANALYZE user_tokens");
 }
 
@@ -1362,20 +1414,13 @@ function fetchMissingBook(int $id, string $ext): ?string {
  * ['status' => 'ok'|'archive_error', 'zip' => ZipArchive|null, 'dbFilename' => ?string].
  */
 function book_open_source($dbh, int $id, string $ext): ?array {
-	// Literal, not a bound parameter, so the query keeps the exact shape it had
-	// before: with EMULATE_PREPARES off, Postgres infers the type of the single
-	// placeholder from the BETWEEN comparison.
-	$usr = ($ext === 'fb2') ? '0' : '1';
-	$stmt = $dbh->prepare("SELECT filename FROM book_zip WHERE ? BETWEEN start_id AND end_id AND usr=$usr");
-	$stmt->execute([$id]);
-	$zipRow = $stmt->fetch();
+	$usr = ($ext === 'fb2') ? 0 : 1;
+	$zipName = book_zip_filename($dbh, $id, $usr);
 
-	$fnStmt = $dbh->prepare("SELECT filename FROM libfilename WHERE BookId = ?");
-	$fnStmt->execute([$id]);
-	$fnRow = $fnStmt->fetch();
-	$dbFilename = $fnRow ? $fnRow->filename : null;
+	$meta = book_meta($dbh, $id);
+	$dbFilename = ($meta && $meta->filename !== null && $meta->filename !== '') ? $meta->filename : null;
 
-	if (!$zipRow) {
+	if ($zipName === '') {
 		// Not covered by any local archive — try the configured mirror. The
 		// renderers then read the downloaded file from LOCAL_LIBRARY_PATH, so an
 		// unopened ZipArchive is handed back, exactly as this branch did before.
@@ -1390,14 +1435,278 @@ function book_open_source($dbh, int $id, string $ext): ?array {
 	$innerZipName = ($dbFilename && strtolower(pathinfo($dbFilename, PATHINFO_EXTENSION)) === 'zip')
 		? $dbFilename
 		: $id . '.' . $ext . '.zip';
-	resolve_inner_zip_book($zipRow->filename, $id, $innerZipName, $ext);
+	resolve_inner_zip_book($zipName, $id, $innerZipName, $ext);
 
 	$zip = new ZipArchive();
-	if ($zip->open($zipRow->filename) !== true) {
-		error_log("book_open_source: cannot open archive {$zipRow->filename} for book $id");
+	if ($zip->open($zipName) !== true) {
+		error_log("book_open_source: cannot open archive {$zipName} for book $id");
 		return ['status' => 'archive_error', 'zip' => null, 'dbFilename' => $dbFilename];
 	}
 	return ['status' => 'ok', 'zip' => $zip, 'dbFilename' => $dbFilename];
+}
+
+/* ===================================================================== caches
+ *
+ * Library content (the lib* tables and book_zip) only changes when a dump is
+ * imported, the archives are rescanned or a book is added locally, yet the same
+ * handful of rows is re-read on every page view, every download and every cover.
+ * The helpers below put that behind the optional Redis cache, keyed by a library
+ * generation that those three operations bump - so nothing has to hunt down
+ * individual entries, and an installation without Redis keeps working unchanged
+ * (each helper still memoises per request).
+ *
+ * User-owned data is a different matter and is NOT cached here, with two narrow
+ * exceptions carrying their own invalidation: user_prefs() and user_favs().
+ */
+
+/** How long cached library content lives; the generation makes it stale sooner. */
+define('BOOK_CACHE_TTL', 7 * 86400);
+
+/**
+ * Everything about a book that the pages, the download endpoints and the readers
+ * need: the libbook row plus its annotation, its stored file name and its first
+ * author.
+ *
+ * Replaces both `SELECT b.*` (whose md5 bytea column comes back as a stream that
+ * cannot be cached) and the seven-way LEFT JOIN that fb2.php used to run just to
+ * build a download file name - that join multiplied the row out across every genre,
+ * series and author of the book and then kept the first row.
+ *
+ * Returns null for an unknown id; the miss itself is remembered briefly so that a
+ * scan of made-up ids cannot turn into a query each.
+ */
+function book_meta($dbh, int $id): ?object {
+	static $memo = [];
+	if ($id <= 0) {
+		return null;
+	}
+	if (array_key_exists($id, $memo)) {
+		return $memo[$id];
+	}
+
+	$key = book_cache_key((string)$id);
+	$row = cache_get($key);
+	if ($row === null) {
+		$stmt = $dbh->prepare("SELECT b.bookid, b.filesize, b.\"time\", b.title, b.title1, b.lang,
+				b.filetype, b.year, b.deleted, b.fileauthor, b.keywords,
+				encode(b.md5, 'hex') md5hex,
+				(SELECT Body FROM libbannotations WHERE BookId = b.bookid LIMIT 1) body,
+				(SELECT filename FROM libfilename WHERE BookId = b.bookid LIMIT 1) filename,
+				(SELECT CONCAT(an.LastName, ' ', an.FirstName)
+					FROM libavtor a JOIN libavtorname an USING(AvtorId)
+					WHERE a.BookId = b.bookid ORDER BY a.pos LIMIT 1) author_name
+			FROM libbook b WHERE b.bookid = :id LIMIT 1");
+		$stmt->bindValue(":id", $id, PDO::PARAM_INT);
+		$stmt->execute();
+		$row = $stmt->fetch(PDO::FETCH_OBJ);
+		if ($row) {
+			cache_set($key, $row, BOOK_CACHE_TTL);
+		} else {
+			// Remember the miss too, but only briefly: a walk over made-up ids should
+			// not cost a query each, while a book that appears later must show up
+			// without waiting a week.
+			$row = false;
+			cache_set($key, false, 600);
+		}
+	}
+	$memo[$id] = ($row === false) ? null : $row;
+	return $memo[$id];
+}
+
+/**
+ * The archive holding a book, or '' when none does.
+ *
+ * Answered from the generated index file (see zipindex.php), which every
+ * deployment has, with the book_zip table as the fallback until the first rescan
+ * after an upgrade.
+ */
+function book_zip_filename($dbh, int $id, int $usr): string {
+	include_once(__DIR__ . '/zipindex.php');
+	$fromIndex = zip_index_lookup($id, $usr);
+	if ($fromIndex !== null) {
+		return $fromIndex;
+	}
+
+	static $warned = false;
+	if (!$warned) {
+		error_log('Flibusta: no zip index yet, resolving archives from book_zip - run "Сканирование ZIP" to build it.');
+		$warned = true;
+	}
+	$stmt = $dbh->prepare("SELECT filename FROM book_zip WHERE ? BETWEEN start_id AND end_id AND usr = ?");
+	$stmt->execute([$id, $usr]);
+	$row = $stmt->fetch();
+	return $row ? (string)$row->filename : '';
+}
+
+/**
+ * Authors, genres and series of a book - the badges on the info card.
+ *
+ * @return array{authors: list<object>, genres: list<object>, series: list<object>}
+ */
+function book_header_lists($dbh, int $id): array {
+	static $memo = [];
+	if (isset($memo[$id])) {
+		return $memo[$id];
+	}
+	$lists = cache_remember(book_cache_key('hdr:' . $id), BOOK_CACHE_TTL, static function () use ($dbh, $id) {
+		$authors = $dbh->prepare("SELECT AvtorId, LastName, FirstName, nickname, middlename, File FROM libavtor a
+			LEFT JOIN libavtorname USING(AvtorId)
+			LEFT JOIN libapics USING(AvtorId)
+			WHERE a.BookId = :id");
+		$authors->bindValue(":id", $id, PDO::PARAM_INT);
+		$authors->execute();
+
+		$genres = $dbh->prepare("SELECT GenreId, GenreDesc FROM libgenre
+			JOIN libgenrelist USING(GenreId)
+			WHERE BookId = :id");
+		$genres->bindValue(":id", $id, PDO::PARAM_INT);
+		$genres->execute();
+
+		$series = $dbh->prepare("SELECT SeqId, SeqName, SeqNumb FROM libseq
+			JOIN libseqname USING(SeqId)
+			WHERE BookId = :id");
+		$series->bindValue(":id", $id, PDO::PARAM_INT);
+		$series->execute();
+
+		return [
+			'authors' => $authors->fetchAll(PDO::FETCH_OBJ),
+			'genres'  => $genres->fetchAll(PDO::FETCH_OBJ),
+			'series'  => $series->fetchAll(PDO::FETCH_OBJ),
+		];
+	});
+	$memo[$id] = is_array($lists) ? $lists : ['authors' => [], 'genres' => [], 'series' => []];
+	return $memo[$id];
+}
+
+/** Flibusta's own comments on a book. */
+function book_reviews($dbh, int $id): array {
+	return cache_remember(book_cache_key('rev:' . $id), BOOK_CACHE_TTL, static function () use ($dbh, $id) {
+		$stmt = $dbh->prepare("SELECT name, text FROM libreviews WHERE bookid = :id ORDER BY time");
+		$stmt->bindValue(":id", $id, PDO::PARAM_INT);
+		$stmt->execute();
+		return $stmt->fetchAll(PDO::FETCH_OBJ);
+	}) ?: [];
+}
+
+/**
+ * A user's preferences, including their hidden-genre list.
+ *
+ * These are read on hot pages - book_view_mode on every book page,
+ * author_default_tab on every author page, the hidden genres on every listing -
+ * and change only from the settings page.
+ *
+ * This does NOT contradict the rule that settings are never cached in $_SESSION:
+ * that rule exists because a session is per device and long-lived, so a copy there
+ * goes stale the moment the user saves on another device. There is one shared copy
+ * here, and every writer deletes it, so all devices see a change on their next
+ * request. last_book is deliberately absent - it is written on every book view and
+ * read only at log-in, so the DB stays its only home.
+ */
+function user_prefs($dbh, int $userId): object {
+	if ($userId <= 0) {
+		return (object)['login_redirect' => null, 'author_default_tab' => null,
+			'book_view_mode' => null, 'excluded_genres' => []];
+	}
+	// Request-scope memo kept in a global, not a function static, so that
+	// user_prefs_invalidate() can clear it too - a save and the re-render that
+	// follows happen in the same request.
+	if (isset($GLOBALS['__flibusta_prefs'][$userId])) {
+		return $GLOBALS['__flibusta_prefs'][$userId];
+	}
+
+	$prefs = cache_remember("user:$userId:prefs", 86400, static function () use ($dbh, $userId) {
+		try {
+			$stmt = $dbh->prepare("SELECT login_redirect, author_default_tab, book_view_mode
+				FROM user_settings WHERE user_id = ?");
+			$stmt->execute([$userId]);
+			$row = $stmt->fetch(PDO::FETCH_OBJ);
+
+			$genres = [];
+			$gstmt = $dbh->prepare("SELECT genreid FROM user_excluded_genres WHERE user_id = ? ORDER BY genreid");
+			$gstmt->execute([$userId]);
+			while ($g = $gstmt->fetch()) {
+				// The single point of origin that makes it safe for callers to inline
+				// these ids into an SQL IN (...) list.
+				$genres[] = (int)$g->genreid;
+			}
+
+			return (object)[
+				'login_redirect'     => $row->login_redirect ?? null,
+				'author_default_tab' => $row->author_default_tab ?? null,
+				'book_view_mode'     => $row->book_view_mode ?? null,
+				'excluded_genres'    => $genres,
+			];
+		} catch (Exception $e) {
+			// Fail open: a broken preference must never break browsing.
+			error_log('Flibusta: user preferences read failed: ' . $e->getMessage());
+			return null;
+		}
+	});
+
+	if (!is_object($prefs)) {
+		$prefs = (object)['login_redirect' => null, 'author_default_tab' => null,
+			'book_view_mode' => null, 'excluded_genres' => []];
+	}
+	$GLOBALS['__flibusta_prefs'][$userId] = $prefs;
+	return $prefs;
+}
+
+/** Drops the cached preferences after a save. */
+function user_prefs_invalidate(int $userId): void {
+	unset($GLOBALS['__flibusta_prefs'][$userId]);
+	cache_del("user:$userId:prefs");
+}
+
+/**
+ * A user's favorites as lookup maps: ['books' => [id => true], 'authors' => ...,
+ * 'series' => ...].
+ *
+ * Listing pages render ten book cards, and each card used to ask the DB whether
+ * that one book was a favorite. One query for the whole list replaces all of them,
+ * and with Redis even that one goes away.
+ */
+function user_favs($dbh, int $userId): array {
+	$empty = ['books' => [], 'authors' => [], 'series' => []];
+	if ($userId <= 0) {
+		return $empty;
+	}
+	// A global, not a function static, so user_favs_invalidate() can clear it
+	// within the request that toggled a favorite.
+	if (isset($GLOBALS['__flibusta_favs'][$userId])) {
+		return $GLOBALS['__flibusta_favs'][$userId];
+	}
+
+	$favs = cache_remember("user:$userId:fav", 86400, static function () use ($dbh, $userId) {
+		try {
+			$stmt = $dbh->prepare("SELECT bookid, avtorid, seqid FROM fav WHERE user_id = ?");
+			$stmt->execute([$userId]);
+			$out = ['books' => [], 'authors' => [], 'series' => []];
+			while ($row = $stmt->fetch()) {
+				if (!empty($row->bookid)) {
+					$out['books'][(int)$row->bookid] = true;
+				}
+				if (!empty($row->avtorid)) {
+					$out['authors'][(int)$row->avtorid] = true;
+				}
+				if (!empty($row->seqid)) {
+					$out['series'][(int)$row->seqid] = true;
+				}
+			}
+			return $out;
+		} catch (Exception $e) {
+			error_log('Flibusta: favorites read failed: ' . $e->getMessage());
+			return null;
+		}
+	});
+
+	$GLOBALS['__flibusta_favs'][$userId] = is_array($favs) ? $favs : $empty;
+	return $GLOBALS['__flibusta_favs'][$userId];
+}
+
+/** Drops the cached favorites after any change to a user's fav rows. */
+function user_favs_invalidate(int $userId): void {
+	unset($GLOBALS['__flibusta_favs'][$userId]);
+	cache_del("user:$userId:fav");
 }
 
 function resolve_inner_zip_book(string $outerZipPath, int $bookId, string $innerZipName, string $ext): ?string {

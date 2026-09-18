@@ -21,6 +21,8 @@ fi
 
 echo "Создание индекса zip-файлов"
 php /tools/update_zip_list.php  > /cache/log/update_zip_list.log
+# Расположение книг по архивам изменилось — сбрасываем кэш описаний книг
+php /tools/cache_bump.php >> /cache/log/update_zip_list.log 2>&1
 echo "Сканирование zip-файлов завершено"
 date > /cache/timestamps/app_reindex
 

@@ -52,21 +52,17 @@ r.themes.default({
 });
 
 <?php if ($current_user_id > 0): ?>
-var saveEpubUrl = <?= json_encode($saveEpubUrl, JSON_UNESCAPED_SLASHES) ?>;
-var epubBookId = <?= (int)$url->var1 ?>;
-var epubCsrf = <?= json_encode($saveCsrf) ?>;
-var saveCfiTimeout;
+var positionSaver = makePositionSaver(
+	<?= json_encode($saveEpubUrl, JSON_UNESCAPED_SLASHES) ?>,
+	<?= (int)$url->var1 ?>,
+	<?= json_encode($saveCsrf) ?>,
+	'cfi',
+	1000
+);
 
 r.on("locationChanged", function(location) {
 	if (!location || !location.start) return;
-	var cfi = location.start.cfi || location.start;
-	clearTimeout(saveCfiTimeout);
-	saveCfiTimeout = setTimeout(function() {
-		var xhr = new XMLHttpRequest();
-		xhr.open("POST", saveEpubUrl, true);
-		xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
-		xhr.send("bookid=" + encodeURIComponent(epubBookId) + "&cfi=" + encodeURIComponent(cfi) + "&csrf_token=" + encodeURIComponent(epubCsrf));
-	}, 500);
+	positionSaver.schedule(location.start.cfi || location.start);
 });
 <?php endif; ?>
 

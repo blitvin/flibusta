@@ -99,14 +99,29 @@ All page requests are rewritten by the web server to `application/public/index.p
   launches a `tools/*.sh` script in the background
   (`stdbuf -o0 /tools/<x>.sh > ADMINOPSTATUSFILE &`). Long ops serialize on an
   `flock` over `ADMINOPLOCKFILE`; the UI polls `ADMINOPSTATUSFILE` for progress.
-- **Sessions** are stored in Postgres via `application/PostgresSessionHandler.php`;
-  clients on the trusted network get long-lived sessions.
+- **Sessions** have two backends, chosen in `init.php`. Without
+  `FLIBUSTA_REDIS_HOST` they live in Postgres
+  (`application/PostgresSessionHandler.php`); with it they live in Redis
+  (`application/RedisSessionHandler.php`), which is what lets hot paths run
+  without touching the DB at all. Clients on the trusted network get long-lived
+  sessions either way. Code that needs to reach *other* users' sessions (the
+  admin session list, "log out everywhere") must go through the `SessionStore`
+  interface in `application/SessionStore.php`, never through SQL against
+  `php_sessions`.
+
+- **The PDO handle is lazy** (`application/LazyPDO.php`): no connection is opened
+  until the first statement runs. Do not assume `$dbh` implies a live connection,
+  and do not add a PDO method call path that the subclass does not override.
 
 - **User settings** (`user_settings` table + the `user_excluded_genres` child
-  table) are read **per request** from the DB — they are deliberately never
-  cached in `$_SESSION`, because sessions are shared across tabs and long-lived
-  for trusted-network clients, so a cached copy would go stale after a save on
-  another device. Follow this convention when adding a setting.
+  table) are still never cached in `$_SESSION` — a session copy is per device and
+  long-lived, so it goes stale after a save somewhere else. They are read through
+  `user_prefs()`, which keeps **one shared copy** in Redis that every writer
+  deletes, so all devices see a change on their next request. Follow that pattern
+  when adding a setting: read it in `user_prefs()`, and call
+  `user_prefs_invalidate()` wherever it is written. `last_book` is the exception —
+  written on every book view, read only at log-in, so it stays DB-only with a
+  write-dedup marker in the cache.
 - **Locally added books** (`addbook` module, admin-only): stored durably in
   `local_*` tables with ids from sequences starting at 10000000 (dump ids never
   reach that); also dual-written into the `lib*` tables so they are live
@@ -130,6 +145,49 @@ Defined in `application/init.php`:
   `status` file, sessions
 - `/sql` — DB dumps (`SQL_PATH`)
 - `ADMINOPLOCKFILE` = `/cache/locks/adminop.lock`, `ADMINOPSTATUSFILE` = `/cache/status`
+
+## Caching (Redis, optional)
+
+Enabled by `FLIBUSTA_REDIS_HOST`. When unset, sessions stay in Postgres and every
+`cache_*()` call in `application/cache.php` is a no-op, so **every code path must
+still work with no cache**. When set and Redis is unreachable, requests fail with
+503 rather than silently splitting session state across two stores.
+
+Keys (under `FLIBUSTA_REDIS_PREFIX`, default `flibusta:`):
+
+| Key | Holds | Dropped by |
+|---|---|---|
+| `sess:<id>`, `sess:all`, `sess:user:<uid>` | sessions + indexes | TTL, `SessionStore` |
+| `auth:<hmac>`, `auth:user:<uid>` | verified HTTP Basic credentials | TTL (5 min), `user_security_changed()` |
+| `book:<gen>:<id>` / `:hdr:` / `:rev:` | book metadata, badges, comments | `lib:gen` bump |
+| `user:<uid>:prefs`, `user:<uid>:fav` | settings + hidden genres, favorite ids | their `*_invalidate()` helpers |
+| `user:<uid>:last_book` | write-dedup marker (not a read cache) | `user_security_changed()` |
+| `lib:gen`, `cache:secret` | generation counter, HMAC key — **no TTL on purpose** | never (evicting them would be wrong) |
+
+Run the instance with `--maxmemory <n> --maxmemory-policy volatile-lru`: everything
+but the last row carries a TTL and may be evicted, and sessions are touched on
+every request so cold book entries go first.
+
+Three rules to keep caches honest:
+
+- Anything that writes the `lib*` tables or `book_zip` must bump the library
+  generation (`php /tools/cache_bump.php` from a script, `lib_generation_bump()`
+  in-process) **and** regenerate the archive index (below).
+- Anything that changes a user's password, role or existence must call
+  `user_security_changed()`.
+- Anything that writes `user_settings` (except `last_book`),
+  `user_excluded_genres` or a user's `fav` rows must call
+  `user_prefs_invalidate()` / `user_favs_invalidate()`.
+
+**Archive index.** The book-id to zip mapping is served from `/cache/zip_index.php`,
+a generated PHP file (`application/zipindex.php`) that OPcache keeps in shared
+memory, so the lookup needs neither the DB nor Redis. It is written by
+`tools/update_zip_list.php` and by the addbook module; `book_zip` remains as the
+fallback until the first archive rescan after an upgrade. OPcache timestamp
+validation must stay enabled or workers will serve a stale layout.
+
+`FLIBUSTA_DEBUG_DB=true` logs one `dbstats <uri> connected=<0|1> statements=<n>`
+line per request — the way to check that a hot path really is DB-free.
 
 ## Database
 
@@ -164,4 +222,11 @@ Defined in `application/init.php`:
 - `POSTGRES_ADMIN_DBPASSWORD_FILE` — Postgres admin password (DB provisioning)
 - `FLIBUSTA_APP_ADMIN` / `FLIBUSTA_APP_ADMIN_PASSWORD_FILE` (or `ADMIN_PASSWORD`) —
   application admin account
+- `FLIBUSTA_REDIS_HOST` / `FLIBUSTA_REDIS_PORT` / `FLIBUSTA_REDIS_DB` /
+  `FLIBUSTA_REDIS_PREFIX` / `FLIBUSTA_REDIS_PASSWORD` (or
+  `FLIBUSTA_REDIS_PASSWORD_FILE`) — optional cache and session store; unset
+  disables both
+- `FLIBUSTA_SESSION_TRUSTED_TTL` — idle lifetime of a trusted-network session in
+  Redis (default 30 days)
+- `FLIBUSTA_DEBUG_DB` — `true` logs per-request DB connection/statement counts
 - `FLIBUSTA_APP_ROOT`, `TZ` — bootstrap / timezone

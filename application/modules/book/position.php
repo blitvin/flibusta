@@ -33,19 +33,18 @@ function bookRestorePosition() {
 	}
 }
 <?php if ($current_user_id > 0): ?>
-var isScrolling;
-var savePositionUrl = <?= json_encode($savePositionUrl, JSON_UNESCAPED_SLASHES) ?>;
-var saveBookId = <?= (int)$saveBookId ?>;
-var saveCsrf = <?= json_encode($saveCsrf) ?>;
+var positionSaver = makePositionSaver(
+	<?= json_encode($savePositionUrl, JSON_UNESCAPED_SLASHES) ?>,
+	<?= (int)$saveBookId ?>,
+	<?= json_encode($saveCsrf) ?>,
+	'pos',
+	1000
+);
 window.addEventListener('scroll', function() {
-	window.clearTimeout(isScrolling);
-	isScrolling = setTimeout(function() {
-		var pos = 100 / document.body.scrollHeight * window.scrollY;
-		var x = new XMLHttpRequest();
-		x.open("POST", savePositionUrl, true);
-		x.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
-		x.send("bookid=" + encodeURIComponent(saveBookId) + "&pos=" + encodeURIComponent(pos) + "&csrf_token=" + encodeURIComponent(saveCsrf));
-	}, 66);
+	// Rounded to two decimals so that sub-pixel scroll jitter does not look like a
+	// new position and defeat the saver's "unchanged value" check.
+	var pos = 100 / document.body.scrollHeight * window.scrollY;
+	positionSaver.schedule(Math.round(pos * 100) / 100);
 }, false);
 <?php endif; ?>
 </script>

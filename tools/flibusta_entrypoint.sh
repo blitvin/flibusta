@@ -105,6 +105,10 @@ fi
 
 
 
+# Индекс zip-архивов: строится при сканировании ZIP, здесь — только для первого
+# запуска после обновления, чтобы не читать book_zip на каждом запросе.
+php /tools/build_zip_index.php
+
 chown -R www-data:www-data /sql/*
 chown -R www-data:www-data /cache/*
 

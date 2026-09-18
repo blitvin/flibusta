@@ -46,9 +46,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $new_hash = password_hash($new_password, PASSWORD_DEFAULT);
                 $stmt = $dbh->prepare("UPDATE users SET password_hash = ? WHERE id = ?");
                 $stmt->execute([$new_hash, $current_user_id]);
-                // Invalidate other sessions, keep current one alive
-                $stmt = $dbh->prepare("DELETE FROM php_sessions WHERE user_id = ? AND id != ?");
-                $stmt->execute([$current_user_id, session_id()]);
+                // Invalidate other sessions and any cached credential, keep this one alive
+                user_security_changed((int)$current_user_id, session_id());
                 $password_success = 'Пароль успешно изменён.';
             } else {
                 $password_error = 'Неверный текущий пароль.';
@@ -73,6 +72,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                                 author_default_tab = EXCLUDED.author_default_tab,
                                                 book_view_mode     = EXCLUDED.book_view_mode");
         $stmt->execute([$current_user_id, $new_redirect, $new_author_tab, $new_book_mode]);
+        // Shared cache, so the change is visible on every device at its next request.
+        user_prefs_invalidate((int)$current_user_id);
         $login_redirect     = $new_redirect;
         $author_default_tab = $new_author_tab;
         $book_view_mode     = $new_book_mode;
@@ -113,6 +114,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             }
             $dbh->commit();
+            user_prefs_invalidate((int)$current_user_id);
             $excluded        = $ids;   // refresh so the re-rendered checkboxes show post-save state
             $xgenres_success = 'Список скрытых жанров сохранён.';
         } catch (Exception $e) {

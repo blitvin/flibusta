@@ -27,20 +27,16 @@ window.ViewerInstance.configure({
 });
 
 <?php if ($current_user_id > 0): ?>
-var saveDjvuUrl = <?= json_encode($saveDjvuUrl, JSON_UNESCAPED_SLASHES) ?>;
-var saveBookId = <?= (int)$saveBookId ?>;
-var saveCsrf = <?= json_encode($saveCsrf) ?>;
-var saveDjvuTimeout;
+var positionSaver = makePositionSaver(
+	<?= json_encode($saveDjvuUrl, JSON_UNESCAPED_SLASHES) ?>,
+	<?= (int)$saveBookId ?>,
+	<?= json_encode($saveCsrf) ?>,
+	'page',
+	1000
+);
 
 window.ViewerInstance.on(DjVu.Viewer.Events.PAGE_NUMBER_CHANGED, function() {
-	var page = window.ViewerInstance.getPageNumber();
-	clearTimeout(saveDjvuTimeout);
-	saveDjvuTimeout = setTimeout(function() {
-		var x = new XMLHttpRequest();
-		x.open("POST", saveDjvuUrl, true);
-		x.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
-		x.send("bookid=" + encodeURIComponent(saveBookId) + "&page=" + encodeURIComponent(page) + "&csrf_token=" + encodeURIComponent(saveCsrf));
-	}, 300);
+	positionSaver.schedule(window.ViewerInstance.getPageNumber());
 });
 <?php endif; ?>
 

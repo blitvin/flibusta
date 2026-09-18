@@ -40,14 +40,17 @@ var canvas = document.getElementById('pdf-canvas');
 var ctx = canvas.getContext('2d');
 
 <?php if ($current_user_id > 0): ?>
-var savePositionUrl = <?= json_encode($savePositionUrl, JSON_UNESCAPED_SLASHES) ?>;
-var saveBookId = <?= (int)$saveBookId ?>;
-var saveCsrf = <?= json_encode($saveCsrf) ?>;
+// Page turns used to POST one request each, undebounced: holding the arrow key
+// through a document fired one per keypress.
+var positionSaver = makePositionSaver(
+    <?= json_encode($savePositionUrl, JSON_UNESCAPED_SLASHES) ?>,
+    <?= (int)$saveBookId ?>,
+    <?= json_encode($saveCsrf) ?>,
+    'pos',
+    1000
+);
 function savePage(pageNum) {
-    var x = new XMLHttpRequest();
-    x.open("POST", savePositionUrl, true);
-    x.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
-    x.send("bookid=" + encodeURIComponent(saveBookId) + "&pos=" + encodeURIComponent(pageNum) + "&csrf_token=" + encodeURIComponent(saveCsrf));
+    positionSaver.schedule(pageNum);
 }
 <?php else: ?>
 function savePage(pageNum) {}

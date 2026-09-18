@@ -1,6 +1,7 @@
 <?php
 error_reporting(E_ALL);
 include('/application/dbinit.php');
+include_once('/application/zipindex.php');
 
 define('MAIN_LIBRARY_DIR','/flibusta/');
 define('LOCAL_FILES_DIR','/cache/local/');
@@ -154,6 +155,9 @@ $stmt->execute();
 
 $dbh->beginTransaction();
 
+$indexFb2 = [];
+$indexUsr = [];
+
 foreach($filteredFb2 as $bookFile ) {
     $stmt = $dbh->prepare("INSERT INTO book_zip (filename, start_id, end_id, usr) VALUES (:fn, :start, :end, :usr)");
     $filepath = ($bookFile->local)? LOCAL_FILES_DIR.$bookFile->path : MAIN_LIBRARY_DIR.$bookFile->path;
@@ -162,6 +166,7 @@ foreach($filteredFb2 as $bookFile ) {
 	$stmt->bindParam(":end", $bookFile->endId);
 	$stmt->bindValue(":usr", 0);
 	$stmt->execute();
+	$indexFb2[] = [(int)$bookFile->startId, (int)$bookFile->endId, $filepath];
 }
 
 
@@ -173,6 +178,13 @@ foreach($filteredUsr as $bookFile ) {
 	$stmt->bindParam(":end", $bookFile->endId);
 	$stmt->bindValue(":usr", 1);
 	$stmt->execute();
+	$indexUsr[] = [(int)$bookFile->startId, (int)$bookFile->endId, $filepath];
 }
 
 $dbh->commit();
+
+// The runtime reads the mapping from this file rather than from book_zip; the
+// table stays as the fallback for an installation that has not rescanned yet.
+if (zip_index_write($indexFb2, $indexUsr)) {
+    fwrite(STDERR, 'zip index written: ' . (count($indexFb2) + count($indexUsr)) . ' archives' . PHP_EOL);
+}

@@ -39,7 +39,14 @@ RUN find /public_files -name "*.php" -exec sh -c '> "{}"' \;
 RUN find /public_files -type f -regex ".*\.\(js\|css\|svg\|xml\)" -exec gzip -k -9 {} + \
     && find /public_files -type f -regex ".*\.\(js\|css\|svg\|xml\)" -exec brotli -k -Z {} +
 
-RUN chmod +x /usr/local/bin/install-php-extensions; install-php-extensions gd bz2 pdo_pgsql zip
+# redis (phpredis) backs the optional session store and cache - see application/cache.php.
+# The app runs without it; it is only used when FLIBUSTA_REDIS_HOST is set.
+RUN chmod +x /usr/local/bin/install-php-extensions; install-php-extensions gd bz2 pdo_pgsql zip redis
+
+# OPcache timestamp validation must stay on (the default): /cache/zip_index.php is a
+# generated PHP file that the archive rescan rewrites at runtime, and with
+# opcache.validate_timestamps=0 workers would keep serving the previous library
+# layout until php-fpm is reloaded.
 
 COPY --from=fb2cng-downloader /usr/local/bin/fbc /usr/local/bin/fbc
 

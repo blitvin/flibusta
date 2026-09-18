@@ -11,35 +11,29 @@ session_start();
 // reached directly (and from OPDS acquisition links), not only through index.php.
 checkFileAccess($dbh, $webroot);
 
-$stmt = $dbh->prepare("SELECT libbook.Title BookTitle,
-	libfilename.filename,
-	CONCAT(libavtorname.LastName, ' ', libavtorname.FirstName) author_name
-		FROM libbook
-		LEFT JOIN libbannotations USING(BookId)
-		LEFT JOIN libgenre USING(BookId)
-		LEFT JOIN libgenrelist USING(GenreId)
-		LEFT JOIN libseq USING(BookId)
-		LEFT JOIN libavtor USING(BookId)
-		LEFT JOIN libavtorname USING(AvtorId)
-		LEFT JOIN libseqname USING(SeqId)
-		LEFT JOIN libfilename USING(BookId)
-		WHERE libbook.BookId=:id");
-$stmt->bindParam(":id", $id);
-$stmt->execute();
-$book = $stmt->fetch();
+// Cached, and a single row: this used to be a seven-way LEFT JOIN across the
+// annotation, genre, series and author tables, run on every download purely to
+// build the file name the browser is offered.
+$book = book_meta($dbh, $id);
+$dbFilename = ($book && $book->filename !== null && $book->filename !== '') ? $book->filename : null;
 
-if (isset($book->filename) && strtolower(pathinfo($book->filename, PATHINFO_EXTENSION)) === 'zip') {
+if ($dbFilename !== null && strtolower(pathinfo($dbFilename, PATHINFO_EXTENSION)) === 'zip') {
 	$fname        = null;
-	$innerZipName = $book->filename;
-} elseif (isset($book->filename)) {
-	$fname        = $book->filename;
-	$innerZipName = $book->filename . '.zip';
+	$innerZipName = $dbFilename;
+} elseif ($dbFilename !== null) {
+	$fname        = $dbFilename;
+	$innerZipName = $dbFilename . '.zip';
 } else {
 	$fname        = $id . '.fb2';
 	$innerZipName = $id . '.fb2.zip';
 }
 
-$downloadBaseName = $book->author_name . ' - ' . $book->booktitle . ' ' . $id;
+// An id with no row in libbook can still have a file on disk (a download from the
+// mirror, an archive newer than the last import), so fall back to a bare id rather
+// than refusing to serve it.
+$downloadBaseName = $book
+	? $book->author_name . ' - ' . $book->title . ' ' . $id
+	: (string)$id;
 
 // Validate final_format parameter
 $final_format = '';
@@ -67,19 +61,17 @@ function send_download_headers(string $name, string $mime, int $size): void {
 function ensure_local_fb2(int $id, string $localPath, $dbh, $fname, string $innerZipName): ?string {
 	if (file_exists($localPath)) return $localPath;
 
-	$stmt = $dbh->prepare("SELECT * FROM book_zip WHERE ? BETWEEN start_id AND end_id AND usr=0");
-	$stmt->execute([$id]);
-	$zipRow = $stmt->fetch();
+	$zipName = book_zip_filename($dbh, $id, 0);
 
-	if ($zipRow) {
+	if ($zipName !== '') {
 		// Try inner-zip extraction (writes to LOCAL_LIBRARY_PATH and returns path)
-		$resolved = resolve_inner_zip_book($zipRow->filename, $id, $innerZipName, 'fb2');
+		$resolved = resolve_inner_zip_book($zipName, $id, $innerZipName, 'fb2');
 		if ($resolved !== null) return $resolved;
 
 		// Fallback: file sits directly in the outer zip
 		if ($fname !== null && strtolower(pathinfo($fname, PATHINFO_EXTENSION)) !== 'zip') {
 			$zip = new ZipArchive();
-			if ($zip->open($zipRow->filename) === true) {
+			if ($zip->open($zipName) === true) {
 				if ($zip->locateName($fname) !== false) {
 					$data = $zip->getFromName($fname);
 					$zip->close();
@@ -119,10 +111,8 @@ if ($final_format === '') {
 		exit;
 	}
 
-	$stmt = $dbh->prepare("SELECT * FROM book_zip WHERE ? BETWEEN start_id AND end_id AND usr=0");
-	$stmt->execute([$id]);
-	$zipRow = $stmt->fetch();
-	if (!$zipRow) {
+	$zip_name = book_zip_filename($dbh, $id, 0);
+	if ($zip_name === '') {
 		$localPath = fetchMissingBook($id, 'fb2');
 		if ($localPath !== null) {
 			send_fb2_headers($downloadName);
@@ -132,7 +122,6 @@ if ($final_format === '') {
 		echo "NO ZIP";
 		exit;
 	}
-	$zip_name = $zipRow->filename;
 	$zip = new ZipArchive();
 	if (!$zip->open($zip_name)) {
 		echo "NO ZIP";

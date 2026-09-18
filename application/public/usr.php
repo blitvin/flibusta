@@ -13,33 +13,34 @@ session_start();
 // reached directly (and from OPDS acquisition links), not only through index.php.
 checkFileAccess($dbh, $webroot);
 
-$stmt = $dbh->prepare("SELECT libbook.Title BookTitle, libfilename.filename, libbook.filetype,
-	CONCAT(libavtorname.LastName, ' ', libavtorname.FirstName) author_name
-		FROM libbook
-		LEFT JOIN libavtor USING(BookId)
-		LEFT JOIN libfilename USING(BookId)
-		LEFT JOIN libavtorname USING(AvtorId)
-		WHERE libbook.BookId=:id");
-$stmt->bindParam(":id", $id);
-$stmt->execute();
-$book = $stmt->fetch();
+// Cached, and a single row - see book_meta() in functions.php.
+$book = book_meta($dbh, $id);
+if (!$book) {
+	// Without the row there is no way to know the file's extension, so there is
+	// nothing to look for in the archives. (This used to be a fatal error on
+	// trim(null) instead of an answer.)
+	http_response_code(404);
+	echo "Book file not found in archive";
+	exit;
+}
 
-$ext = strtolower(trim($book->filetype));
+$ext = strtolower(trim((string)$book->filetype));
+$dbFilename = ($book->filename !== null && $book->filename !== '') ? $book->filename : null;
 
 // If libfilename says the stored file is already a zip wrapper, skip the direct lookup.
 // Otherwise use the libfilename name directly, falling back to {id}.{ext} if absent.
-if (isset($book->filename) && strtolower(pathinfo($book->filename, PATHINFO_EXTENSION)) === 'zip') {
-	$fname        = null;               // no direct entry to look for
-	$innerZipName = $book->filename;    // e.g. 709533.pdf.zip
-} elseif (isset($book->filename)) {
-	$fname        = $book->filename;
-	$innerZipName = $book->filename . '.zip';
+if ($dbFilename !== null && strtolower(pathinfo($dbFilename, PATHINFO_EXTENSION)) === 'zip') {
+	$fname        = null;            // no direct entry to look for
+	$innerZipName = $dbFilename;     // e.g. 709533.pdf.zip
+} elseif ($dbFilename !== null) {
+	$fname        = $dbFilename;
+	$innerZipName = $dbFilename . '.zip';
 } else {
 	$fname        = $id . '.' . $ext;
 	$innerZipName = $id . '.' . $ext . '.zip';
 }
 
-$downloadName = $book->author_name . " - " . $book->booktitle . " " . $id . "." . $book->filename . "." . trim($book->filetype);
+$downloadName = $book->author_name . " - " . $book->title . " " . $id . "." . $dbFilename . "." . $ext;
 
 function send_book_headers(string $name): void {
 	header('Content-Description: File Transfer');
@@ -59,12 +60,9 @@ if (file_exists($localPath)) {
 	exit;
 }
 
-// 2. Look up outer zip in DB
-$stmt = $dbh->prepare("SELECT * FROM book_zip WHERE :id BETWEEN start_id AND end_id AND usr=1");
-$stmt->bindParam(":id", $id);
-$stmt->execute();
-$zipRow = $stmt->fetch();
-if (!$zipRow) {
+// 2. Look up the outer zip in the generated archive index (book_zip as fallback)
+$zip_name = book_zip_filename($dbh, $id, 1);
+if ($zip_name === '') {
 	$localPath = fetchMissingBook(intval($id), $ext);
 	if ($localPath !== null) {
 		send_book_headers($downloadName);
@@ -74,7 +72,6 @@ if (!$zipRow) {
 	echo "NO ZIP";
 	exit;
 }
-$zip_name = $zipRow->filename;
 $zip = new ZipArchive();
 
 if (!$zip->open($zip_name)) {

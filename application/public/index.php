@@ -22,7 +22,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $current_user_id > 0) {
 	} else {
 		$action = $_POST['action'] ?? '';
 		$id = intval($_POST['id'] ?? 0);
-		
+		$fav_changed = in_array($action, ['fav_book', 'unfav_book', 'fav_author',
+			'unfav_author', 'fav_seq', 'unfav_seq'], true) && $id > 0;
+
 		if ($action === 'fav_book' && $id > 0) {
 			$st = $dbh->prepare("INSERT INTO fav (user_id, bookid) VALUES(:uid, :id) ON CONFLICT DO NOTHING");
 			$st->bindParam(":uid", $current_user_id);
@@ -62,6 +64,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $current_user_id > 0) {
 			$st->bindParam(":uid", $current_user_id);
 			$st->bindParam(":id", $id);
 			$st->execute();
+		}
+		// The page re-rendered right after this reads the favorites back, so the
+		// cached copy has to go before it does.
+		if ($fav_changed) {
+			user_favs_invalidate($current_user_id);
 		}
 	}
 }

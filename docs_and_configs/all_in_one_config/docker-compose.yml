@@ -30,9 +30,21 @@ services:
         ports:
             - '27100:80'
 
+    redis:
+        image: 'redis:alpine'
+        # Sessions and caches are disposable, so persistence is off. volatile-lru
+        # keeps the two untagged keys (lib:gen, cache:secret) safe from eviction
+        # while letting cold book entries go first under memory pressure.
+        command: >
+            redis-server --save "" --appendonly no
+            --maxmemory 128mb --maxmemory-policy volatile-lru
+        restart: unless-stopped
+
     php-fpm:
         build: phpdocker/php-fpm
         working_dir: /application
+        depends_on:
+            - redis
         volumes:
             - './Flibusta.Net:/flibusta:ro'
             - './FlibustaSQL:/sql'
@@ -53,6 +65,9 @@ services:
             # - FLIBUSTA_ALLOW_ADMIN_ACCESS_BY_HTTP=true
             - FLIBUSTA_URL=https://flibusta.is
             - FLIBUSTA_ENABLE_MISSING_BOOK_DOWNLOAD=true
+            # Optional: comment out to keep sessions in Postgres and the cache off.
+            - FLIBUSTA_REDIS_HOST=redis
+            - FLIBUSTA_REDIS_PORT=6379
         secrets:
             - FLIBUSTA_PWD
             - FLIBUSTA_APP_ADMIN_PWD

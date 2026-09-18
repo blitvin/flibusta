@@ -68,8 +68,32 @@ ini_set('session.cookie_secure', '1');   // Only send cookie over HTTPS
 ini_set('session.cookie_httponly', '1'); // Prevent Javascript from stealing the cookie
 ini_set('session.use_only_cookies', '1');
 
-include_once __DIR__ . '/PostgresSessionHandler.php';
-$handler = new PostgresSessionHandler($dbh, TRUSTED_NET);
+// PHP's built-in default is 24 minutes, far shorter than the 4h cookie handed out
+// above, so a browsing reader could be logged out while their cookie was still
+// valid. Both backends read this: the Postgres handler passes it to its gc(), the
+// Redis handler uses its own per-client TTL.
+ini_set('session.gc_maxlifetime', '14400');
+
+include_once __DIR__ . '/cache.php';
+include_once __DIR__ . '/SessionStore.php';
+
+// Two session backends. Redis is opt-in; without it nothing about sessions
+// changes. With it, a failure is fatal for the request rather than a silent
+// fallback to Postgres - state split across two stores would show up as users
+// randomly logged out and as an admin session list that lies.
+if (flibusta_redis_enabled()) {
+	include_once __DIR__ . '/RedisSessionHandler.php';
+	$_sessionRedis = flibusta_redis_or_die();
+	$handler = new RedisSessionHandler($_sessionRedis, TRUSTED_NET);
+	session_store_init(new RedisSessionStore($_sessionRedis));
+	// Safe here because RedisSessionHandler implements validateId(); the Postgres
+	// handler does not, so it is left alone.
+	ini_set('session.use_strict_mode', '1');
+} else {
+	include_once __DIR__ . '/PostgresSessionHandler.php';
+	$handler = new PostgresSessionHandler($dbh, TRUSTED_NET);
+	session_store_init(new PostgresSessionStore($dbh));
+}
 session_set_save_handler($handler, true);
 
 
@@ -79,6 +103,20 @@ if ($tz !== false){
     date_default_timezone_set($tz);
 }
 error_reporting(E_ALL);
+
+// Opt-in instrumentation for the caching work: one line per request in the php-fpm
+// error log saying whether the DB was reached at all and how many statements ran.
+// "connected=0 statements=0" is what a fully cached hot path looks like.
+if (getenv('FLIBUSTA_DEBUG_DB') === 'true') {
+	register_shutdown_function(static function () use ($dbh) {
+		error_log(sprintf(
+			'dbstats %s connected=%d statements=%d',
+			$_SERVER['REQUEST_URI'] ?? 'cli',
+			$dbh->isConnected() ? 1 : 0,
+			LazyPDO::$statements
+		));
+	});
+}
 
 $cdt = date('Y-m-d H:i:s');
 $opds_updated = date(DateTime::RFC3339);

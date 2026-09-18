@@ -2,8 +2,9 @@
 // Пользователи (основной таб)
 
 function invalidateUserSessions($dbh, $user_id) {
-    $stmt_delete = $dbh->prepare("DELETE FROM php_sessions WHERE user_id = ?");
-    $stmt_delete->execute([$user_id]);
+    // Sessions plus anything else that carries this user's authorisation - see
+    // user_security_changed() in functions.php.
+    user_security_changed((int)$user_id);
 }
 
 if (empty($_SESSION['csrf_token'])) {
