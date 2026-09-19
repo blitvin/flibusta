@@ -63,6 +63,51 @@ Docker. Если он живёт в той же `flibusta_net`, ничего д�
 Redis всё же доступен за пределами доверенной сети, задайте пароль и укажите его
 через `FLIBUSTA_REDIS_PASSWORD_FILE`.
 
+### Пароль для Redis
+
+Официальный образ Redis не умеет читать пароль из файла, поэтому его нужно
+подставить в `--requirepass` при запуске. Прямолинейный вариант
+`/bin/sh -c "redis-server ..."` имеет неочевидный побочный эффект: entrypoint
+образа переключается на пользователя `redis` только если первым аргументом идёт
+`redis-server`, и при обёртке в `sh -c` сервер остаётся работать под root.
+Поэтому entrypoint вызывается повторно — пароль читает root, а привилегии
+сбрасываются как обычно:
+
+```
+   flibusta-redis:
+        image: 'redis:alpine'
+        command: >
+         sh -c 'exec docker-entrypoint.sh redis-server
+         --save "" --appendonly no
+         --maxmemory 128mb --maxmemory-policy volatile-lru
+         --requirepass "$$(cat /run/secrets/FLIBUSTA_REDIS_PWD)"'
+        networks:
+           flibusta_net:
+        secrets:
+            - FLIBUSTA_REDIS_PWD
+```
+
+Обратите внимание на `$$`: compose раскрывает `$` сам, до запуска контейнера, и
+одиночный `$(` он считает ошибкой подстановки. Удвоенный `$$` доходит до
+оболочки как обычный `$`. Одинарные кавычки вокруг команды избавляют от
+экранирования двойных.
+
+Продолжения команды должны быть выровнены **ровно по первой строке**, как выше.
+В блоке `>` строки с бóльшим отступом (например, подогнанные под `exec` для
+красоты) не сворачиваются в пробелы, а сохраняют переводы строк, и оболочка
+воспримет `--save` как отдельную команду.
+
+Секрет нужно объявить **в обоих сервисах** (в `flibusta-redis` — чтобы задать
+пароль, в `flibusta-fpm` — чтобы его отправлять) и в разделе `secrets` верхнего
+уровня; сервису библиотеки дополнительно нужна переменная
+`FLIBUSTA_REDIS_PASSWORD_FILE=/run/secrets/FLIBUSTA_REDIS_PWD`. Файл с паролем
+должен быть в одну строку: завершающий перевод строки отбрасывают обе стороны, а
+вот ведущие пробелы `$(cat ...)` сохранит, и получится необъяснимый `NOAUTH`.
+
+Проверка: `docker exec flibusta-redis redis-cli ping` должен ответить
+`NOAUTH Authentication required.`, а `docker exec flibusta-redis id` — показать
+`uid=999(redis)`.
+
 Переменные окружения сервиса `flibusta-fpm`:
 
 | Переменная | Назначение |
@@ -70,7 +115,7 @@ Redis всё же доступен за пределами доверенной 
 | `FLIBUSTA_REDIS_HOST` | имя сервиса Redis; не задана — Redis не используется |
 | `FLIBUSTA_REDIS_PORT` | порт, по умолчанию 6379 |
 | `FLIBUSTA_REDIS_DB` | номер базы, по умолчанию 0 |
-| `FLIBUSTA_REDIS_PREFIX` | префикс ключей, по умолчанию `flibusta:` |
+| `FLIBUSTA_REDIS_PREFIX` | префикс ключей, по умолчанию `flibusta:`. В compose-файле запишите строку в кавычках — `- "FLIBUSTA_REDIS_PREFIX=flibusta:"`, иначе YAML примет завершающее двоеточие за ключ отображения и compose откажется читать файл с ошибкой `unexpected type map[string]interface {}` |
 | `FLIBUSTA_REDIS_PASSWORD_FILE` | файл с паролем (или `FLIBUSTA_REDIS_PASSWORD`) |
 | `FLIBUSTA_SESSION_TRUSTED_TTL` | время жизни сессии клиента из доверенной сети, по умолчанию 30 дней |
 

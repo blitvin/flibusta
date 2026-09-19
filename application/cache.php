@@ -67,9 +67,19 @@ function flibusta_redis(): ?Redis
 
 	$password = '';
 	if (getenv('FLIBUSTA_REDIS_PASSWORD_FILE')) {
-		$fromFile = @file_get_contents((string)getenv('FLIBUSTA_REDIS_PASSWORD_FILE'));
-		if ($fromFile !== false) {
-			$password = trim($fromFile);
+		// Loud on purpose. Falling back to an empty password would connect
+		// fine and then fail every single command with NOAUTH, which looks
+		// like a broken cache rather than a missing secret.
+		$file = (string)getenv('FLIBUSTA_REDIS_PASSWORD_FILE');
+		$fromFile = @file_get_contents($file);
+		if ($fromFile === false) {
+			error_log("Flibusta: cannot read FLIBUSTA_REDIS_PASSWORD_FILE ($file) - check that the secret is declared for this service and readable by the php-fpm user.");
+			return null;
+		}
+		$password = trim($fromFile);
+		if ($password === '') {
+			error_log("Flibusta: FLIBUSTA_REDIS_PASSWORD_FILE ($file) is empty.");
+			return null;
 		}
 	}
 	if ($password === '' && getenv('FLIBUSTA_REDIS_PASSWORD')) {
@@ -85,8 +95,14 @@ function flibusta_redis(): ?Redis
 		}
 		$r->setOption(Redis::OPT_READ_TIMEOUT, 1.0);
 		if ($password !== '') {
-			$r->auth($password);
+			if ($r->auth($password) === false) {
+				error_log("Flibusta: Redis at $host:$port rejected the password.");
+				return null;
+			}
 		}
+		// One local round trip to turn "server wants a password we do not have"
+		// into a clear failure here, instead of a NOAUTH on every later command.
+		$r->ping();
 		$db = (int)(getenv('FLIBUSTA_REDIS_DB') ?: 0);
 		if ($db !== 0) {
 			$r->select($db);

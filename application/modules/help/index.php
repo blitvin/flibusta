@@ -11,6 +11,9 @@ $authUrlSample = $host ? $scheme . '://username:password@' . $host . $opdsPath :
 
 echo "<h4>Справка</h4><br><br>";
 
+echo "<h5>Flibusta-at-home blog</h5>";
+echo "<p>Блог проекта Flibusta-at-home: <a href='https://elfwood.org/elfblog/ru/topics/flibusta-at-home/'>https://elfwood.org/elfblog/ru/topics/flibusta-at-home/</a> содержит различные сведения по установке, администрированию и использованию flibusta-at-home.</p>";
+echo "<p>Разработчики публикуют там объяснеиния, FAQ и инструкции по использованию. Если у Вас  возникли проблемы, возможно там содержатся способы их устранения.</p>";
 echo "<h5>OPDS</h5>";
 echo "<p>OPDS (Open Publication Distribution System) — это стандартный каталогный протокол для электронных ридеров.
  Он позволяет подключаться к библиотеке как к каталогу, просматривать книги и загружать их из мобильного приложения.</p>";
