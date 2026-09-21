@@ -43,6 +43,11 @@ RUN find /public_files -type f -regex ".*\.\(js\|css\|svg\|xml\)" -exec gzip -k 
 # The app runs without it; it is only used when FLIBUSTA_REDIS_HOST is set.
 RUN chmod +x /usr/local/bin/install-php-extensions; install-php-extensions gd bz2 pdo_pgsql zip redis
 
+# Xdebug for the local development stack only (dev/docker-compose.yml passes 1).
+# Off by default so published images never ship a debugger.
+ARG INSTALL_XDEBUG=0
+RUN if [ "$INSTALL_XDEBUG" = "1" ]; then install-php-extensions xdebug; fi
+
 # OPcache timestamp validation must stay on (the default): /cache/zip_index.php is a
 # generated PHP file that the archive rescan rewrites at runtime, and with
 # opcache.validate_timestamps=0 workers would keep serving the previous library

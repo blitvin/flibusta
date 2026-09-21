@@ -1,0 +1,138 @@
+# Local development stack for flibusta-at-home.
+#
+# Differs from the deployment configs in three ways that matter:
+#   * application/ and tools/ are bind-mounted over the image, so an edit in
+#     VSCode is live on the next request - no rebuild, no restart.
+#   * Xdebug is built in and listens for VSCode (see xdebug.ini).
+#   * Books come from the NAS over NFS, read-only, mounted by Docker itself.
+#
+# Everything else - nginx config, entrypoint, migrations - is the real thing,
+# so what you test here is what runs in production.
+#
+# Usage: ./setup.sh once, then `docker compose up -d --build` from this directory.
+
+name: flibusta-dev
+
+services:
+  postgres:
+    build:
+      context: ../phpdocker/pg
+    environment:
+      - POSTGRES_USER=flibusta
+      - POSTGRES_DB=flibusta
+      # Same secret as the app's FLIBUSTA_DBPASSWORD_FILE on purpose: here the
+      # app user IS the superuser, so the entrypoint's provisioning branch is
+      # skipped entirely. Two different files would just fail to connect.
+      - POSTGRES_PASSWORD_FILE=/run/secrets/FLIBUSTA_PWD
+    secrets:
+      - FLIBUSTA_PWD
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    # Exposed on loopback only, for psql / the VSCode SQL client.
+    ports:
+      - '127.0.0.1:${DEV_PG_PORT:-25432}:5432'
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U flibusta -d flibusta']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  redis:
+    image: redis:alpine
+    command: >
+     redis-server --save "" --appendonly no
+     --maxmemory 128mb --maxmemory-policy volatile-lru
+    # Loopback only, so `redis-cli -p 26379 monitor` works from the host while
+    # you watch which requests actually touch the cache.
+    ports:
+      - '127.0.0.1:${DEV_REDIS_PORT:-26379}:6379'
+    restart: unless-stopped
+
+  php-fpm:
+    build:
+      context: ..
+      dockerfile: phpdocker/php-fpm/Dockerfile
+      args:
+        INSTALL_XDEBUG: '1'
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    # Lets Xdebug reach the VSCode listener on the host.
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    volumes:
+      # Live source. Edit in VSCode, reload the page, done.
+      - ../application:/application
+      - ../tools:/tools
+      - ./xdebug.ini:/usr/local/etc/php/conf.d/zz-xdebug.ini:ro
+      # Books from the NAS, read-only.
+      - books:/flibusta:ro
+      # Working data. Kept out of the repo; see .gitignore.
+      - ./data/sql:/sql
+      - ./data/cache:/cache
+    environment:
+      - TZ=${TZ:-Europe/Moscow}
+      - FLIBUSTA_WEBROOT=
+      - FLIBUSTA_DBUSER=flibusta
+      - FLIBUSTA_DBNAME=flibusta
+      - FLIBUSTA_DBTYPE=postgres
+      - FLIBUSTA_DBHOST=postgres
+      - FLIBUSTA_DBPASSWORD_FILE=/run/secrets/FLIBUSTA_PWD
+      - MAX_FB2_SIZE_2_DISPLAY=100000000
+      - FLIBUSTA_APP_ADMIN=${DEV_ADMIN_USER:-admin}
+      - FLIBUSTA_APP_ADMIN_PASSWORD_FILE=/run/secrets/FLIBUSTA_APP_ADMIN_PWD
+      - FLIBUSTA_URL=${FLIBUSTA_URL:-https://flibusta.is}
+      - FLIBUSTA_ENABLE_MISSING_BOOK_DOWNLOAD=true
+      # Required here: the admin pages refuse plain HTTP otherwise, and you
+      # need them to run the dump import. Never set this in production.
+      - FLIBUSTA_ALLOW_ADMIN_ACCESS_BY_HTTP=true
+      # FLIBUSTA_TRUSTED_NET is deliberately unset, so dev always exercises
+      # the login path. Set it in .env to test trusted-network behaviour.
+      - FLIBUSTA_TRUSTED_NET=${FLIBUSTA_TRUSTED_NET:-}
+      # Comment the Redis block out to test the no-cache path.
+      - FLIBUSTA_REDIS_HOST=${FLIBUSTA_REDIS_HOST:-redis}
+      - FLIBUSTA_REDIS_PORT=6379
+      - FLIBUSTA_REDIS_DB=0
+      - "FLIBUSTA_REDIS_PREFIX=flibusta:"
+      # One log line per request with the connection/statement count. This is
+      # the whole point of the dev stack; turn it off if the noise bothers you.
+      - FLIBUSTA_DEBUG_DB=${FLIBUSTA_DEBUG_DB:-true}
+    secrets:
+      - FLIBUSTA_PWD
+      - FLIBUSTA_APP_ADMIN_PWD
+    restart: unless-stopped
+
+  webserver:
+    image: nginx:alpine
+    depends_on:
+      - php-fpm
+    volumes:
+      # The shipped nginx config, unmodified - it already roots at
+      # /application/public and proxies to the php-fpm service by name.
+      - ../phpdocker/nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ../application:/application:ro
+    ports:
+      - '${DEV_HTTP_PORT:-8080}:80'
+    restart: unless-stopped
+
+volumes:
+  db-data:
+
+  # Docker mounts the NAS export itself when the stack starts; nothing is
+  # mounted on the host, and no fstab entry is needed. `soft` matters: if the
+  # NAS goes away, reads fail instead of hanging php-fpm workers forever.
+  books:
+    driver: local
+    driver_opts:
+      type: nfs
+      o: 'addr=${NAS_HOST:?set NAS_HOST in dev/.env},ro,nfsvers=4,soft,timeo=50,retrans=2'
+      device: ':${NAS_BOOKS_EXPORT:?set NAS_BOOKS_EXPORT in dev/.env}'
+
+secrets:
+  FLIBUSTA_PWD:
+    file: ../secrets/flibusta_pwd.txt
+  FLIBUSTA_APP_ADMIN_PWD:
+    file: ../secrets/flibusta_app_admin_pwd.txt
