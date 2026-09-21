@@ -61,10 +61,12 @@ session_set_cookie_params([ 'lifetime' => $isTrustedClient ? 3600 * 24 * 365 : 3
                             'samesite' => 'Lax']);
 
 ini_set('session.serialize_handler', 'php_serialize');
-if (ADMIN_ACCESS_BY_HTTPS) {
-    ini_set('session.cookie_secure', '1');   // Only send cookie over HTTPS
-}
-ini_set('session.cookie_secure', '1');   // Only send cookie over HTTPS
+// 'secure' is set once, by session_set_cookie_params() above, from
+// ADMIN_ACCESS_BY_HTTPS (true unless FLIBUSTA_ALLOW_ADMIN_ACCESS_BY_HTTP=true).
+// Do not re-apply it with ini_set() here: an unconditional call used to sit at
+// this spot and silently overrode the flag, so a deployment that opted into
+// plain HTTP got a Secure cookie the browser would not send back - no session
+// ever persisted and the login form reappeared forever.
 ini_set('session.cookie_httponly', '1'); // Prevent Javascript from stealing the cookie
 ini_set('session.use_only_cookies', '1');
 
