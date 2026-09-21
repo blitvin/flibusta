@@ -8,3 +8,7 @@ testing/*
 # H1: never commit real secrets; ship *.example templates only
 secrets/*
 !secrets/*.example
+
+# local development stack (dev/) - working data and machine-specific settings
+dev/data/
+dev/.env
