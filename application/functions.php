@@ -1274,7 +1274,10 @@ function createRememberMeToken($pdo, $userId, $webroot) {
 				$cookieValue,
 				['expires' => time() + (86400 *30),
 				'path' => $webroot != "" ? $webroot : "/",
-                'secure' => true,
+                // Same rule as the session cookie: Secure unless the operator
+                // explicitly opted into plain HTTP, otherwise remember-me is
+                // silently dead on an HTTP deployment.
+                'secure' => ADMIN_ACCESS_BY_HTTPS,
                 'httponly' => true,
                 'samesite' => 'Lax'
 				]
