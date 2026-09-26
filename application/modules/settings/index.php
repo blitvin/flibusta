@@ -9,14 +9,16 @@ if ($current_user_id === 0) {
 
 $csrfToken = get_csrf_token();
 
-$stmt = $dbh->prepare("SELECT login_redirect, author_default_tab, book_view_mode FROM user_settings WHERE user_id = ?");
-$stmt->execute([$current_user_id]);
-$saved = $stmt->fetch();
-$login_redirect     = $saved ? $saved->login_redirect     : 'default';
-$author_default_tab = $saved ? $saved->author_default_tab : 'alpha';
-$book_view_mode     = $saved ? $saved->book_view_mode     : 'contentonly';
+// One read through the shared cached copy the rest of the app acts on, so this page
+// cannot disagree with the author and book pages. It also carries the hidden genres,
+// which is what get_excluded_genres() was fetching here. Both saves below drop the
+// copy with user_prefs_invalidate().
+$prefs = user_prefs($dbh, $current_user_id);
+$login_redirect     = $prefs->login_redirect     ?? 'default';
+$author_default_tab = $prefs->author_default_tab ?? 'alpha';
+$book_view_mode     = $prefs->book_view_mode     ?? 'contentonly';
 
-$excluded = get_excluded_genres($dbh, $current_user_id);
+$excluded = $prefs->excluded_genres;
 
 $password_success = '';
 $password_error   = '';
@@ -54,17 +56,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
     } elseif (isset($_POST['save_settings'])) {
-        $new_redirect = $_POST['login_redirect'] ?? 'default';
+        // Every absent or invalid field falls back to the value in force, never to the
+        // built-in default. The three preferences used to live in three forms that each
+        // posted only their own field, and this branch rewrote all three columns from
+        // hardcoded defaults - so saving one card silently reset the other two. They
+        // are one form now, but keep the fallback honest: a stale cached page or a
+        // future partial form must leave a preference it does not carry alone.
+        $new_redirect = $_POST['login_redirect'] ?? $login_redirect;
         if (!in_array($new_redirect, ['default', 'favorites', 'genres', 'last_book'], true)) {
-            $new_redirect = 'default';
+            $new_redirect = $login_redirect;
         }
-        $new_author_tab = $_POST['author_default_tab'] ?? 'alpha';
+        $new_author_tab = $_POST['author_default_tab'] ?? $author_default_tab;
         if (!in_array($new_author_tab, ['about', 'alpha', 'series', 'year'], true)) {
-            $new_author_tab = 'alpha';
+            $new_author_tab = $author_default_tab;
         }
-        $new_book_mode = $_POST['book_view_mode'] ?? 'contentonly';
+        $new_book_mode = $_POST['book_view_mode'] ?? $book_view_mode;
         if (!in_array($new_book_mode, ['withannotation', 'contentonly'], true)) {
-            $new_book_mode = 'contentonly';
+            $new_book_mode = $book_view_mode;
         }
         $stmt = $dbh->prepare("INSERT INTO user_settings (user_id, login_redirect, author_default_tab, book_view_mode)
             VALUES (?, ?, ?, ?)
@@ -79,10 +87,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $book_view_mode     = $new_book_mode;
         $settings_success   = 'Настройки сохранены.';
     } elseif (isset($_POST['save_excluded_genres'])) {
-        // NB: this branch has its own submit name on purpose. The three
-        // preference forms above all post save_settings and each posts only its
-        // own field, so that branch rewrites all three columns; reusing it here
-        // would silently reset the user's other preferences on every save.
+        // Own submit name on purpose: the genre list is a separate form with its own
+        // button next to the checkboxes, and its own transaction below. The preference
+        // branch above writes user_settings columns and knows nothing about genres.
         $ids = [];
         foreach ((array)($_POST['excluded_genres'] ?? []) as $g) {
             if (ctype_digit((string)$g)) {
@@ -203,89 +210,82 @@ while ($g = $xg_rows->fetch()) {
     </div>
   </div>
 
-  <div class="col-md-5">
+  <div class="col-md-7">
     <div class="card mb-4">
-      <div class="card-header"><h5 class="mb-0">Страница после входа</h5></div>
+      <div class="card-header"><h5 class="mb-0">Настройки чтения</h5></div>
       <div class="card-body">
         <?php if ($settings_success): ?>
           <div class="alert alert-success"><?= htmlspecialchars($settings_success, ENT_QUOTES, 'UTF-8') ?></div>
         <?php endif; ?>
+        <!-- One form, one button on purpose. These used to be three forms whose buttons
+             all posted save_settings, each carrying only its own field, so saving one of
+             them reset the other two preferences. Now every group is posted on every
+             save and nothing can be lost. -->
         <form method="POST">
           <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8') ?>">
-          <div class="form-check mb-2">
-            <input class="form-check-input" type="radio" name="login_redirect" id="redirect_default"
-              value="default" <?= $checked['default'] ?>>
-            <label class="form-check-label" for="redirect_default">Главная страница</label>
-          </div>
-          <div class="form-check mb-2">
-            <input class="form-check-input" type="radio" name="login_redirect" id="redirect_favorites"
-              value="favorites" <?= $checked['favorites'] ?>>
-            <label class="form-check-label" for="redirect_favorites">Избранное (если есть)</label>
-          </div>
-          <div class="form-check mb-3">
-            <input class="form-check-input" type="radio" name="login_redirect" id="redirect_genres"
-              value="genres" <?= $checked['genres'] ?>>
-            <label class="form-check-label" for="redirect_genres">Жанры</label>
-          </div>
-          <div class="form-check mb-3">
-            <input class="form-check-input" type="radio" name="login_redirect" id="redirect_last_book"
-              value="last_book" <?= $checked['last_book'] ?>>
-            <label class="form-check-label" for="redirect_last_book">Последняя открытая книга</label>
-          </div>
-          <button type="submit" name="save_settings" class="btn btn-primary">Сохранить</button>
-        </form>
-      </div>
-    </div>
-  </div>
 
-  <div class="col-md-5">
-    <div class="card mb-4">
-      <div class="card-header"><h5 class="mb-0">Режим открытия книги по умолчанию</h5></div>
-      <div class="card-body">
-        <form method="POST">
-          <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8') ?>">
-          <div class="form-check mb-2">
-            <input class="form-check-input" type="radio" name="book_view_mode" id="bvm_content"
-              value="contentonly" <?= $bvm_checked['contentonly'] ?>>
-            <label class="form-check-label" for="bvm_content">Читать (только текст)</label>
-          </div>
-          <div class="form-check mb-3">
-            <input class="form-check-input" type="radio" name="book_view_mode" id="bvm_annotation"
-              value="withannotation" <?= $bvm_checked['withannotation'] ?>>
-            <label class="form-check-label" for="bvm_annotation">О книге (аннотация и отзывы)</label>
-          </div>
-          <button type="submit" name="save_settings" class="btn btn-primary">Сохранить</button>
-        </form>
-      </div>
-    </div>
-  </div>
+          <fieldset class="mb-3">
+            <legend class="fs-6 fw-semibold">Страница после входа</legend>
+            <div class="form-check mb-2">
+              <input class="form-check-input" type="radio" name="login_redirect" id="redirect_default"
+                value="default" <?= $checked['default'] ?>>
+              <label class="form-check-label" for="redirect_default">Главная страница</label>
+            </div>
+            <div class="form-check mb-2">
+              <input class="form-check-input" type="radio" name="login_redirect" id="redirect_favorites"
+                value="favorites" <?= $checked['favorites'] ?>>
+              <label class="form-check-label" for="redirect_favorites">Избранное (если есть)</label>
+            </div>
+            <div class="form-check mb-2">
+              <input class="form-check-input" type="radio" name="login_redirect" id="redirect_genres"
+                value="genres" <?= $checked['genres'] ?>>
+              <label class="form-check-label" for="redirect_genres">Жанры</label>
+            </div>
+            <div class="form-check">
+              <input class="form-check-input" type="radio" name="login_redirect" id="redirect_last_book"
+                value="last_book" <?= $checked['last_book'] ?>>
+              <label class="form-check-label" for="redirect_last_book">Последняя открытая книга</label>
+            </div>
+          </fieldset>
 
-  <div class="col-md-5">
-    <div class="card mb-4">
-      <div class="card-header"><h5 class="mb-0">Вкладка по умолчанию на странице автора</h5></div>
-      <div class="card-body">
-        <form method="POST">
-          <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8') ?>">
-          <div class="form-check mb-2">
-            <input class="form-check-input" type="radio" name="author_default_tab" id="tab_about"
-              value="about" <?= $tab_checked['about'] ?>>
-            <label class="form-check-label" for="tab_about">Об авторе</label>
-          </div>
-          <div class="form-check mb-2">
-            <input class="form-check-input" type="radio" name="author_default_tab" id="tab_alpha"
-              value="alpha" <?= $tab_checked['alpha'] ?>>
-            <label class="form-check-label" for="tab_alpha">По алфавиту</label>
-          </div>
-          <div class="form-check mb-2">
-            <input class="form-check-input" type="radio" name="author_default_tab" id="tab_series"
-              value="series" <?= $tab_checked['series'] ?>>
-            <label class="form-check-label" for="tab_series">По сериям</label>
-          </div>
-          <div class="form-check mb-3">
-            <input class="form-check-input" type="radio" name="author_default_tab" id="tab_year"
-              value="year" <?= $tab_checked['year'] ?>>
-            <label class="form-check-label" for="tab_year">По году</label>
-          </div>
+          <fieldset class="mb-3">
+            <legend class="fs-6 fw-semibold">Режим открытия книги по умолчанию</legend>
+            <div class="form-check mb-2">
+              <input class="form-check-input" type="radio" name="book_view_mode" id="bvm_content"
+                value="contentonly" <?= $bvm_checked['contentonly'] ?>>
+              <label class="form-check-label" for="bvm_content">Читать (только текст)</label>
+            </div>
+            <div class="form-check">
+              <input class="form-check-input" type="radio" name="book_view_mode" id="bvm_annotation"
+                value="withannotation" <?= $bvm_checked['withannotation'] ?>>
+              <label class="form-check-label" for="bvm_annotation">О книге (аннотация и отзывы)</label>
+            </div>
+          </fieldset>
+
+          <fieldset class="mb-3">
+            <legend class="fs-6 fw-semibold">Вкладка по умолчанию на странице автора</legend>
+            <div class="form-check mb-2">
+              <input class="form-check-input" type="radio" name="author_default_tab" id="tab_about"
+                value="about" <?= $tab_checked['about'] ?>>
+              <label class="form-check-label" for="tab_about">Об авторе</label>
+            </div>
+            <div class="form-check mb-2">
+              <input class="form-check-input" type="radio" name="author_default_tab" id="tab_alpha"
+                value="alpha" <?= $tab_checked['alpha'] ?>>
+              <label class="form-check-label" for="tab_alpha">По алфавиту</label>
+            </div>
+            <div class="form-check mb-2">
+              <input class="form-check-input" type="radio" name="author_default_tab" id="tab_series"
+                value="series" <?= $tab_checked['series'] ?>>
+              <label class="form-check-label" for="tab_series">По сериям</label>
+            </div>
+            <div class="form-check">
+              <input class="form-check-input" type="radio" name="author_default_tab" id="tab_year"
+                value="year" <?= $tab_checked['year'] ?>>
+              <label class="form-check-label" for="tab_year">По году</label>
+            </div>
+          </fieldset>
+
           <button type="submit" name="save_settings" class="btn btn-primary">Сохранить</button>
         </form>
       </div>
