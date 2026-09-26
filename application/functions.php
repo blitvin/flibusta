@@ -1353,14 +1353,32 @@ function fetchMissingBook(int $id, string $ext): ?string {
 			CURLOPT_TIMEOUT        => 60,
 			CURLOPT_FAILONERROR    => true,
 		]);
-		$ok       = curl_exec($ch);
-		$httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-		$finalUrl = curl_getinfo($ch, CURLINFO_EFFECTIVE_URL);
+		$ok        = curl_exec($ch);
+		$httpCode  = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+		$finalUrl  = curl_getinfo($ch, CURLINFO_EFFECTIVE_URL);
+		$contentType = (string)curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
 		fclose($fh);
 		if (!$ok || $httpCode !== 200 || !file_exists($tmpPath) || filesize($tmpPath) < 100) {
 			@unlink($tmpPath);
 			error_log("fetchMissingBook: failed to download book $id.$ext from $url (HTTP $httpCode)");
 			return null;
+		}
+
+		// The mirror answers "not available" with an ordinary HTML page and HTTP
+		// 200, which passed every check above and was then cached in
+		// LOCAL_LIBRARY_PATH under the book's own name - so the reader was served
+		// a web page as the book, for good. Reject markup unless the book really
+		// is html; the fb2 sniff below is separate because fb2 is XML.
+		if (!in_array($ext, ['html', 'htm'], true)) {
+			$head = (string)@file_get_contents($tmpPath, false, null, 0, 512);
+			$looksLikeHtml = stripos($contentType, 'text/html') === 0
+				|| preg_match('/^\s*(<!doctype\s+html|<html[\s>])/i', $head) === 1;
+			if ($looksLikeHtml) {
+				@unlink($tmpPath);
+				error_log("fetchMissingBook: $url returned an HTML page rather than book $id.$ext"
+					. " (content-type: $contentType) - not caching it");
+				return null;
+			}
 		}
 
 		// For fb2: the server may redirect to a .fb2.zip — extract the fb2 entry directly.
@@ -1857,4 +1875,275 @@ function resolve_inner_zip_book(string $outerZipPath, int $bookId, string $inner
 		flock($lockFh, LOCK_UN);
 		fclose($lockFh);
 	}
+}
+
+// Image types a comic page may be. Everything else in the archive (ComicInfo.xml,
+// Thumbs.db, nested directories) is ignored. Defined here rather than in init.php
+// so the CLI tools that include only functions.php still see it.
+if (!defined('COMIC_IMAGE_EXT')) {
+	define('COMIC_IMAGE_EXT', ['jpg', 'jpeg', 'png', 'gif', 'webp', 'avif']);
+}
+
+/** Where a comic's pages are unpacked. One directory per book, like an extracted book file. */
+function comic_dir(int $bookId): string {
+	return LOCAL_LIBRARY_PATH . 'comic/' . $bookId . '/';
+}
+
+/**
+ * Page files inside a comic directory, in reading order.
+ *
+ * scandir(), not glob(): bsdtar writes the names the RAR archive carries, and a
+ * page called "001 [scan].jpg" is a glob pattern, not a file name.
+ */
+function comic_dir_pages(string $dir): array {
+	$pages = [];
+	foreach (scandir($dir) ?: [] as $name) {
+		if ($name === '.' || $name === '..') {
+			continue;
+		}
+		if (is_file($dir . $name) && in_array(strtolower(pathinfo($name, PATHINFO_EXTENSION)), COMIC_IMAGE_EXT, true)) {
+			$pages[] = $name;
+		}
+	}
+	// Page order in a comic is file-name order, and those names are numbered
+	// (page1, page2, ... page10), so a natural sort and not a plain one.
+	natcasesort($pages);
+	return array_values($pages);
+}
+
+/**
+ * The pages of a cbr/cbz comic, unpacked once into /cache/local/comic/<id>/.
+ *
+ * A comic is a plain archive of images, so "rendering" it is unpacking it and
+ * serving the images in file-name order. Two archive flavours occur, and the
+ * extension does not decide which: of the 285 comics in a full Flibusta
+ * collection 155 are ZIP and 130 are RAR, and at least one file named .cbr is a
+ * ZIP. So the magic bytes decide.
+ *
+ * RAR goes through bsdtar (libarchive, BSD-2), never unrar - see the note in
+ * phpdocker/php-fpm/Dockerfile. libarchive cannot read *solid* RAR archives
+ * (about 10 of those 285); those fail here and the page offers a download.
+ *
+ * @return list<string>|null Page file names, or null when the comic cannot be unpacked.
+ */
+function comic_pages($dbh, int $bookId, string $ext): ?array {
+	$dir = comic_dir($bookId);
+
+	// Already unpacked by an earlier request.
+	if (is_dir($dir)) {
+		$pages = comic_dir_pages($dir);
+		if ($pages) {
+			return $pages;
+		}
+	}
+
+	$src = book_open_source($dbh, $bookId, $ext);
+	if ($src === null || $src['status'] !== 'ok') {
+		return null;
+	}
+	$archive = $src['zip'];   // the outer library archive, or null when the book came from the mirror
+
+	$lockFh = fopen(CACHE_PATH . 'locks/comic_' . $bookId . '.lock', 'c');
+	if ($lockFh === false) {
+		if ($archive !== null) {
+			$archive->close();
+		}
+		return null;
+	}
+	flock($lockFh, LOCK_EX);
+
+	try {
+		// Another request may have finished while we waited for the lock.
+		if (is_dir($dir)) {
+			$pages = comic_dir_pages($dir);
+			if ($pages) {
+				return $pages;
+			}
+		}
+
+		$tmpDir = CACHE_PATH . 'tmp/comic_' . $bookId . '_' . uniqid();
+		if (!@mkdir($tmpDir, 0755, true)) {
+			error_log("comic_pages: cannot create $tmpDir");
+			return null;
+		}
+
+		try {
+			// The comic file itself: already extracted next to the other books, or
+			// still inside the library archive.
+			$comicFile = LOCAL_LIBRARY_PATH . $bookId . '.' . $ext;
+			if (!is_file($comicFile)) {
+				if ($archive === null) {
+					error_log("comic_pages: book $bookId has neither a local file nor an archive");
+					return null;
+				}
+				$entry = $archive->locateName($bookId . '.' . $ext) !== false
+					? $bookId . '.' . $ext
+					: ($src['dbFilename'] !== null && $archive->locateName($src['dbFilename']) !== false
+						? $src['dbFilename']
+						: null);
+				if ($entry === null) {
+					error_log("comic_pages: book $bookId is not in its archive");
+					return null;
+				}
+				$comicFile = $tmpDir . '/comic.' . $ext;
+				$in  = $archive->getStream($entry);
+				$out = fopen($comicFile, 'wb');
+				stream_copy_to_stream($in, $out);
+				fclose($in);
+				fclose($out);
+			}
+
+			$magic = (string)@file_get_contents($comicFile, false, null, 0, 8);
+			$pageDir = $tmpDir . '/pages';
+			if (!@mkdir($pageDir, 0755)) {
+				error_log("comic_pages: cannot create $pageDir");
+				return null;
+			}
+
+			if (str_starts_with($magic, "PK\x03\x04")) {
+				$ok = comic_unpack_zip($comicFile, $pageDir, $bookId);
+			} elseif (str_starts_with($magic, "Rar!\x1a\x07")) {
+				$ok = comic_unpack_rar($comicFile, $pageDir, $bookId);
+			} else {
+				error_log("comic_pages: book $bookId is neither ZIP nor RAR (magic " . bin2hex(substr($magic, 0, 4)) . ')');
+				$ok = false;
+			}
+			if (!$ok) {
+				return null;
+			}
+
+			$pages = comic_dir_pages($pageDir . '/');
+			if (!$pages) {
+				error_log("comic_pages: book $bookId unpacked to no images at all");
+				return null;
+			}
+
+			// Publish the finished directory under its final name in one step, so a
+			// concurrent reader never sees a half-unpacked comic.
+			if (!@mkdir(dirname(rtrim($dir, '/')), 0755, true) && !is_dir(dirname(rtrim($dir, '/')))) {
+				error_log('comic_pages: cannot create ' . dirname(rtrim($dir, '/')));
+				return null;
+			}
+			if (!@rename($pageDir, rtrim($dir, '/'))) {
+				error_log("comic_pages: cannot install pages for book $bookId at $dir");
+				return null;
+			}
+			return $pages;
+
+		} finally {
+			comic_rmtree($tmpDir);
+		}
+	} finally {
+		if ($archive !== null) {
+			$archive->close();
+		}
+		flock($lockFh, LOCK_UN);
+		fclose($lockFh);
+	}
+}
+
+/**
+ * Unpacks the image entries of a ZIP comic.
+ *
+ * Entry names come from an archive nobody vetted, so they are never used as a
+ * path: each image is written under its own basename, and anything that is not an
+ * image (ComicInfo.xml, Thumbs.db, directories) is skipped.
+ */
+function comic_unpack_zip(string $file, string $destDir, int $bookId): bool {
+	$zip = new ZipArchive();
+	if ($zip->open($file) !== true) {
+		error_log("comic_pages: book $bookId: cannot open the ZIP comic");
+		return false;
+	}
+	$written = 0;
+	try {
+		for ($i = 0; $i < $zip->numFiles; $i++) {
+			$name = (string)$zip->getNameIndex($i);
+			if ($name === '' || str_ends_with($name, '/')) {
+				continue;
+			}
+			if (!in_array(strtolower(pathinfo($name, PATHINFO_EXTENSION)), COMIC_IMAGE_EXT, true)) {
+				continue;
+			}
+			$target = $destDir . '/' . comic_safe_name($name, $i);
+			$in = $zip->getStream($name);
+			if ($in === false) {
+				continue;
+			}
+			$out = fopen($target, 'wb');
+			if ($out === false) {
+				fclose($in);
+				continue;
+			}
+			stream_copy_to_stream($in, $out);
+			fclose($in);
+			fclose($out);
+			$written++;
+		}
+	} finally {
+		$zip->close();
+	}
+	return $written > 0;
+}
+
+/**
+ * Unpacks the image entries of a RAR comic with bsdtar.
+ *
+ * bsdtar is asked to flatten the paths (-s) so nothing from the archive steers
+ * where files land, and a non-zero exit discards the result: for a solid archive
+ * libarchive writes the first page and then fails, and half a comic is worse than
+ * an honest download link.
+ */
+function comic_unpack_rar(string $file, string $destDir, int $bookId): bool {
+	$cmd = 'bsdtar -x -f ' . escapeshellarg($file)
+		. ' -C ' . escapeshellarg($destDir)
+		. " -s '|.*/||' --no-same-owner --no-same-permissions 2>&1";
+	exec($cmd, $output, $code);
+	if ($code !== 0) {
+		$msg = trim(implode('; ', array_slice($output, 0, 3)));
+		error_log("comic_pages: book $bookId: bsdtar failed (exit $code)"
+			. ($msg !== '' ? ": $msg" : '')
+			. ' - a solid RAR archive cannot be unpacked by libarchive');
+		return false;
+	}
+	// Drop whatever is not an image; bsdtar extracted everything the archive held.
+	foreach (scandir($destDir) ?: [] as $name) {
+		if ($name === '.' || $name === '..') {
+			continue;
+		}
+		$f = $destDir . '/' . $name;
+		if (is_dir($f)) {
+			comic_rmtree($f);
+		} elseif (!in_array(strtolower(pathinfo($name, PATHINFO_EXTENSION)), COMIC_IMAGE_EXT, true)) {
+			@unlink($f);
+		}
+	}
+	return (bool)comic_dir_pages($destDir . '/');
+}
+
+/** A basename that is safe to write, keeping the original for sort order. */
+function comic_safe_name(string $entry, int $index): string {
+	$base = basename(str_replace('\\', '/', $entry));
+	$base = preg_replace('/[^A-Za-z0-9._-]/', '_', $base) ?? '';
+	$base = ltrim($base, '.');
+	if ($base === '' || strlen($base) > 100) {
+		$base = sprintf('%05d.%s', $index, strtolower(pathinfo($entry, PATHINFO_EXTENSION)));
+	}
+	return $base;
+}
+
+/** rm -rf for the temp directories above. */
+function comic_rmtree(string $dir): void {
+	foreach (scandir($dir) ?: [] as $name) {
+		if ($name === '.' || $name === '..') {
+			continue;
+		}
+		$f = $dir . '/' . $name;
+		if (is_dir($f)) {
+			comic_rmtree($f);
+		} else {
+			@unlink($f);
+		}
+	}
+	@rmdir($dir);
 }

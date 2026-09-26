@@ -30,7 +30,7 @@ VOLUME "/flibusta"
 VOLUME  "/cache"
 VOLUME  "/sql"
 
-RUN apk --no-cache add postgresql-client python3 coreutils flock tzdata brotli rsync aria2 unzip gcompat
+RUN apk --no-cache add postgresql-client python3 coreutils flock tzdata brotli rsync aria2 unzip gcompat libarchive-tools antiword
 
 
 COPY application/public /public_files

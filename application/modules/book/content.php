@@ -115,6 +115,57 @@ function book_content_txt(int $bid, ?ZipArchive $zip): string {
 		'<div class="divider div-transparent div-dot"></div>', nl2p($content)) . '</section>';
 }
 
+/**
+ * Legacy .doc (Word 97-2003) as text.
+ *
+ * .docx is a zip of XML that docx-preview.min.js renders in the browser; .doc is a
+ * binary OLE2 container nothing here can read, so 4500-odd books used to have no
+ * reading view at all. antiword converts it server-side (GPL v2, like this
+ * project), and the result goes through the same nl2p() path as a .txt - which is
+ * also why 'doc' is a framed format: what reaches the browser is markup this code
+ * generated, not markup out of the book file.
+ *
+ * Text only: images, tables and formatting do not survive. antiword has been
+ * unmaintained since 2005 and does fail on some files, hence the fallback notice -
+ * the download button on the page above still gives the reader the original.
+ */
+function book_content_doc(int $bid, ?ZipArchive $zip): string {
+	$localDoc = LOCAL_LIBRARY_PATH . $bid . '.doc';
+	$tmpDoc   = null;
+	if (!file_exists($localDoc)) {
+		if ($zip === null) {
+			return '<b>Не удается прочесть файл в ZIP архиве</b>';
+		}
+		$data = $zip->getFromName("$bid.doc");
+		if ($data === false) {
+			return '<b>Не удается прочесть файл в ZIP архиве</b>';
+		}
+		$tmpDoc = CACHE_PATH . 'tmp/doc_' . $bid . '_' . uniqid() . '.doc';
+		if (@file_put_contents($tmpDoc, $data) === false) {
+			error_log("book_content_doc: cannot write $tmpDoc");
+			return '<b>Не удается прочесть файл книги</b>';
+		}
+		$localDoc = $tmpDoc;
+	}
+
+	// -m UTF-8.txt is what makes antiword emit UTF-8; without it Cyrillic comes
+	// out as question marks.
+	exec('antiword -m UTF-8.txt ' . escapeshellarg($localDoc) . ' 2>&1', $lines, $code);
+	if ($tmpDoc !== null) {
+		@unlink($tmpDoc);
+	}
+	$text = implode("\n", $lines);
+	if ($code !== 0 || trim($text) === '') {
+		error_log("book_content_doc: antiword failed for book $bid (exit $code): "
+			. trim(implode('; ', array_slice($lines, 0, 2))));
+		return '<b>Не удалось преобразовать .doc для показа в браузере.</b><br>'
+			. 'Файл можно скачать и открыть в текстовом редакторе — воспользуйтесь кнопкой «Скачать» на странице книги.';
+	}
+
+	return '<section>' . str_replace('<p>***</p>',
+		'<div class="divider div-transparent div-dot"></div>', nl2p($text)) . '</section>';
+}
+
 function book_content_html(int $bid, ?ZipArchive $zip, string $ext): string {
 	$localHtml = LOCAL_LIBRARY_PATH . $bid . '.' . $ext;
 	if (file_exists($localHtml)) {
@@ -163,6 +214,9 @@ if (!isset($book->bookid)) {
 			case 'html':
 			case 'htm':
 				$body = book_content_html($bid, $src['zip'], $ext);
+				break;
+			case 'doc':
+				$body = book_content_doc($bid, $src['zip']);
 				break;
 			default:
 				$body = '<b>Формат ' . htmlspecialchars($ext, ENT_QUOTES, 'UTF-8') . ' здесь не отображается</b>';

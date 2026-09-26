@@ -52,6 +52,22 @@ function send_book_headers(string $name): void {
 	header('Pragma: public');
 }
 
+/**
+ * The book's file cannot be produced.
+ *
+ * This endpoint is followed directly by a browser (the download button on the book
+ * page), so it used to answer a click with a 6-byte "NO ZIP" page and HTTP 200 -
+ * indistinguishable from a successful download as far as the browser is concerned.
+ */
+function book_not_available(int $id): never {
+	http_response_code(404);
+	header('Content-Type: text/html; charset=UTF-8');
+	echo "<!doctype html><meta charset='utf-8'><title>Книга недоступна</title>";
+	echo "<p>Файл книги № " . intval($id) . " недоступен: его нет в локальных архивах"
+		. ", и скачать его с зеркала Флибусты не удалось.</p>";
+	exit;
+}
+
 // 1. Check local cache (already extracted from a previous inner-zip request)
 $localPath = LOCAL_LIBRARY_PATH . intval($id) . '.' . $ext;
 if (file_exists($localPath)) {
@@ -69,14 +85,13 @@ if ($zip_name === '') {
 		readfile($localPath);
 		exit;
 	}
-	echo "NO ZIP";
-	exit;
+	book_not_available($id);
 }
 $zip = new ZipArchive();
 
 if (!$zip->open($zip_name)) {
-	echo "NO ZIP";
-	exit;
+	error_log("usr.php: cannot open archive $zip_name for book $id");
+	book_not_available($id);
 }
 
 // 3. File directly in outer zip — serve as normal.

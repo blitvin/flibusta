@@ -53,11 +53,18 @@ $ext = strtolower(trim($book->filetype));
 // onerror= handler inside a book file cannot run with the reader's session.
 // The rest are drawn by a JS library from the binary file (canvas for pdf/djvu,
 // generated DOM for docx/rtf) or bring their own isolation (epub.js).
-$framed_formats = ['fb2', 'txt', 'html', 'htm'];
+// 'doc' is here because antiword converts it to plain text server-side, so what
+// reaches the browser is markup this project generated - same as txt.
+$framed_formats = ['fb2', 'txt', 'html', 'htm', 'doc'];
 
 // Formats that scroll the page and store a percentage in `progress`.
 // epub and djvu keep their own position handling (CFI / page number).
-$progress_formats = ['fb2', 'txt', 'html', 'htm', 'mobi', 'docx', 'rtf'];
+$progress_formats = ['fb2', 'txt', 'html', 'htm', 'mobi', 'docx', 'rtf', 'doc'];
+
+// Formats with a viewer below. Everything else the catalogue carries - chm, and
+// whatever a future dump introduces - has no renderer and is offered as a
+// download instead, which beats the empty reader box that used to appear.
+$viewer_formats = ['epub', 'pdf', 'mobi', 'djvu', 'djv', 'rtf', 'docx', 'cbr', 'cbz'];
 
 if (in_array($ext, $progress_formats, true)) {
     include('position.php');
@@ -73,6 +80,18 @@ if (in_array($ext, $framed_formats, true)) {
        . " referrerpolicy='no-referrer' title='"
        . htmlspecialchars($book->title, ENT_QUOTES, 'UTF-8') . "'></iframe>";
     echo "<script src='$webroot/js/bookframe.js'></script>";
+} elseif (!in_array($ext, $viewer_formats, true)) {
+    // No in-browser viewer exists for this format (cbr, cbz, doc, chm and
+    // whatever else a dump introduces). The page used to emit an empty
+    // <div id='reader'> for these, so the book simply never appeared and the
+    // reader was left with a blank page and no explanation. Offer the file.
+    $ext_html = htmlspecialchars($ext, ENT_QUOTES, 'UTF-8');
+    echo "<div class='alert alert-info text-center' role='alert'>";
+    echo "Книги формата <b>" . $ext_html . "</b> не открываются в браузере — их можно скачать и открыть в подходящей программе.";
+    echo "</div>";
+    echo "<div class='text-center mb-3'>";
+    echo "<a class='btn btn-primary' href='$webroot/usr.php?id=$_bid'>Скачать" . ($ext_html !== '' ? " ($ext_html)" : '') . "</a>";
+    echo "</div>";
 } else {
     // Resolves the archive, pre-extracts an inner zip and falls back to the
     // mirror, so the file is on disk before the viewer requests it via usr.php.
@@ -110,6 +129,10 @@ if (in_array($ext, $framed_formats, true)) {
 
         if ($ext == 'docx') {
             include('docx.php');
+        }
+
+        if (($ext == 'cbr') || ($ext == 'cbz')) {
+            include('comic.php');
         }
 
         echo "</div>";

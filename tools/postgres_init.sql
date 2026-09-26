@@ -1548,6 +1548,11 @@ CREATE TABLE public.epub_progress (
 
 ALTER TABLE public.epub_progress OWNER TO :FLIBUSTA_DBUSER;
 
+--
+-- Page position for the page-based viewers. Named after djvu, which was the first
+-- of them, but the cbr/cbz comic viewer stores its page here too - both count in
+-- whole pages and both save through public/save_djvu_position.php.
+--
 CREATE TABLE public.djvu_progress (
     user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     bookid BIGINT NOT NULL,
