@@ -1,11 +1,31 @@
-version: '3.1'
+# All-in-one: Postgres, nginx, Redis and the library in one file.
+#
+# Every relative path below (./cache, ./Flibusta.Net, ./secrets, ./phpdocker) is
+# meant to resolve against the ROOT of the repository, and the php-fpm image is
+# built from the repository itself. Compose resolves relative paths against the
+# compose file's own directory unless told otherwise, so pass the project
+# directory explicitly:
+#
+#     docker compose -f docs_and_configs/all_in_one_config/docker-compose.yml \
+#            --project-directory . up -d
+#
+# Copying this file to the repository root and running plain `docker compose up -d`
+# there works just as well.
+#
+# nginx here serves plain HTTP. That is fine when TLS is terminated in front of
+# it (Cloudflare Tunnel, another reverse proxy) and acceptable for development;
+# for a library published to the internet by itself, use
+# docs_and_configs/external_services_config. See README.md in this directory.
+
+# Fixed project name, so container and volume names do not depend on which
+# directory the file was launched from.
+name: flibusta
+
 services:
     postgres:
         build: phpdocker/pg
-        working_dir: /application
         volumes:
             - 'db-data:/var/lib/postgresql/data'
-            - './application:/application'
         environment:
             - POSTGRES_USER=flibusta
             # H1: load DB password from a secret file, not inline plaintext.
@@ -21,12 +41,19 @@ services:
 
     webserver:
         image: 'nginx:alpine'
-        working_dir: /application
+        # The volume below is filled by php-fpm's entrypoint, so start it first -
+        # otherwise a fresh installation answers 404 for every asset until the
+        # library container has finished its first start.
+        depends_on:
+            - php-fpm
         volumes:
-            - flibusta_public_files:/application/public
-            - './cache:/application/cache'
-            - './Flibusta.Net:/application/flibusta'
-            - './phpdocker/nginx/nginx.conf:/etc/nginx/conf.d/default.conf'
+            # Static assets come from the volume that php-fpm fills on every start,
+            # mounted read-only: the web server never needs to write the files it
+            # serves, so a compromised nginx cannot modify the application's PHP or
+            # JS. Nothing else from the library is mounted here - the book archives
+            # and /cache are php-fpm's business, and nginx.conf serves neither.
+            - flibusta_public_files:/application/public:ro
+            - './phpdocker/nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro'
         ports:
             - '27100:80'
 
@@ -41,7 +68,11 @@ services:
         restart: unless-stopped
 
     php-fpm:
-        build: phpdocker/php-fpm
+        # The Dockerfile copies application/ and tools/, so the build context is
+        # the repository root, not the directory holding the Dockerfile.
+        build:
+            context: .
+            dockerfile: phpdocker/php-fpm/Dockerfile
         working_dir: /application
         depends_on:
             - redis
@@ -59,9 +90,18 @@ services:
             - MAX_FB2_SIZE_2_DISPLAY=100000000
             - FLIBUSTA_APP_ADMIN=flibustadmin
             - FLIBUSTA_APP_ADMIN_PASSWORD_FILE=/run/secrets/FLIBUSTA_APP_ADMIN_PWD
-            - FLIBUSTA_TRUSTED_NET='192.168.1.0/24'
-            # M1: admin over plaintext HTTP is insecure. Leave disabled in production.
-            # Uncomment ONLY for local development behind a trusted network:
+            # No quotes: compose passes the value through verbatim, and quotes
+            # would become part of it, so the library would reject the subnet and
+            # log "ignoring" - silently leaving the trusted network disabled.
+            - FLIBUSTA_TRUSTED_NET=192.168.1.0/24
+            # Only needed when the READER'S BROWSER is on plain HTTP (development,
+            # or access by http://nas-address:27100 from the LAN): it drops the
+            # Secure flag from the session and remember-me cookies, which a browser
+            # on http:// would otherwise never send back.
+            # Behind Cloudflare Tunnel or any TLS-terminating proxy LEAVE IT UNSET -
+            # the browser is on https:// there, so Secure cookies work even though
+            # this container only ever sees plain HTTP.
+            # Never enable it for a library reachable from the internet over http://.
             # - FLIBUSTA_ALLOW_ADMIN_ACCESS_BY_HTTP=true
             - FLIBUSTA_URL=https://flibusta.is
             - FLIBUSTA_ENABLE_MISSING_BOOK_DOWNLOAD=true
@@ -76,6 +116,9 @@ services:
 
 volumes:
     db-data:
+    # Filled by php-fpm's entrypoint (rsync of /public_files into
+    # /public_mountpoint) and read by the web server.
+    flibusta_public_files:
 secrets:
     POSTGRES_PWD:
         file: ./secrets/postgres_admin_pwd.txt

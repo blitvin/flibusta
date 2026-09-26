@@ -48,11 +48,18 @@ There are two deployment configurations under `docs_and_configs/`:
   is mounted read-only. Reverse-proxy snippets (`flibusta.subdomain.conf`,
   `flibusta.subfolder.conf`), plus `fail2ban` and `logrotate` configs, are included.
 
-- **`all_in_one_config/` — deprecated, kept for backward compatibility.** Bundles the
-  `postgres` and `webserver` (`nginx:alpine`) containers together with php-fpm. It
-  does **not** enforce HTTPS transport and therefore has security shortcomings; do not
-  use it for new deployments. The `postgres` and `webserver` containers exist *only*
-  in this configuration.
+- **`all_in_one_config/` — self-contained, second choice.** Bundles the `postgres`,
+  `webserver` (`nginx:alpine`) and `redis` containers together with php-fpm, builds the
+  app image from the repo, and is run with `--project-directory .` from the repo root.
+  Its nginx serves plain **HTTP**, which is acceptable in two cases only: TLS is
+  terminated upstream (Cloudflare Tunnel, another proxy — then
+  `FLIBUSTA_ALLOW_ADMIN_ACCESS_BY_HTTP` must stay unset, because the browser is still
+  on https:// and returns `Secure` cookies), or an isolated network / development box
+  that cannot obtain a certificate (then the flag is required). `external_services_config`
+  remains preferred for anything published to the internet. Static assets come from the
+  same `flibusta_public_files` volume, mounted read-only in the web server. The
+  `postgres` and `webserver` containers exist *only* in this configuration; see
+  `docs_and_configs/all_in_one_config/README.md`.
 
 Dockerfiles and the bundled nginx / php config live in `phpdocker/`
 (`phpdocker/php-fpm/`, `phpdocker/pg/`, `phpdocker/nginx/`).

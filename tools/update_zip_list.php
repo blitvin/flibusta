@@ -26,7 +26,42 @@ class BooksFile {
 
 }
 
+/**
+ * The id range an archive name declares, or null when the name does not declare one.
+ *
+ * Flibusta's naming is not perfectly regular: alongside f.fb2-24-30559.zip and
+ * f.fb2.123-456.zip the collection contains names like f.usr-870216--875652.zip,
+ * with a doubled hyphen. Splitting that on "-" yields an empty segment, and passing
+ * it to BooksFile's int parameters raised a TypeError that killed the whole scan -
+ * so one odd file name left the archive index un-rebuildable, and with it every
+ * cover that has to be read out of an archive.
+ *
+ * Ignore empty segments, take the last two numbers, and let the caller skip what
+ * still does not parse instead of dying on it.
+ */
+function parseArchiveRange(string $entry): ?array {
+    $dt = str_replace('.zip', '', $entry);
+    $dt = str_replace('f.n.', 'f.n-', $dt);
+    $dt = str_replace('f.fb2.', 'f.n-', $dt);
+    $parts = array_values(array_filter(explode('-', $dt), static function ($p) {
+        return $p !== '';
+    }));
+    $numbers = array_values(array_filter($parts, 'ctype_digit'));
+    if (count($numbers) < 2) {
+        return null;
+    }
+    $start = (int)$numbers[count($numbers) - 2];
+    $end   = (int)$numbers[count($numbers) - 1];
+    if ($end < $start) {
+        return null;
+    }
+    return [$start, $end];
+}
+
 function findMinimalCoverage(array $files ) : ?array {
+    if (!$files) {
+        return [];
+    }
     usort($files, [BooksFile::class, 'compare']);
     $result = [];
     $currentEnd = $files[0]->startId;
@@ -51,12 +86,17 @@ function findMinimalCoverage(array $files ) : ?array {
         }
 
         if ($bestFile == null) {
-            //return null;
-            fwrite(STDERR, "Got a gap current_end = " .$currentEnd." next elem start at ".$files[$i]->startId.PHP_EOL);
-            if ($i < $n) {
-                $bestFile = $files[$i];
-                $maxReach = $files[$i]->endId;
+            // A hole in the collection: no archive starts at or before the current
+            // position. Jump to the next archive there is. Reading $files[$i] before
+            // the bounds check used to raise an Error here once the list ran out,
+            // which aborted the whole rescan.
+            if ($i >= $n) {
+                fwrite(STDERR, "Got a gap current_end = " . $currentEnd . ", no archives left" . PHP_EOL);
+                break;
             }
+            fwrite(STDERR, "Got a gap current_end = " .$currentEnd." next elem start at ".$files[$i]->startId.PHP_EOL);
+            $bestFile = $files[$i];
+            $maxReach = $files[$i]->endId;
         }
         $result[] = $bestFile;
         $currentEnd =$maxReach +1;
@@ -77,16 +117,18 @@ $bookfilesusr = [];
 if ($handle = opendir(MAIN_LIBRARY_DIR)) {
     while (false !== ($entry = readdir($handle))) {   
 		if (strpos($entry, "-") !== false && substr($entry, -4) === ".zip" && strpos($entry,"d.fb2-009")=== false) {
-        	$dt = str_replace(".zip", "", $entry);
-		    $dt = str_replace("f.n.", "f.n-", $dt);
-        	$dt = str_replace("f.fb2.", "f.n-", $dt);
-		    $fn = explode("-", $dt);
-			
+            $range = parseArchiveRange($entry);
+            if ($range === null) {
+                fwrite(STDERR, "Skipping $entry: cannot read an id range from the name" . PHP_EOL);
+                continue;
+            }
+            [$startId, $endId] = $range;
+
             if (strpos($entry, "fb2") !== false) {
-                $bookfilesfb2[] = new BooksFile($fn[1], $fn[2],$entry,false);
+                $bookfilesfb2[] = new BooksFile($startId, $endId,$entry,false);
 		    } else {
-                $bookfilesusr[] = new BooksFile($fn[1], $fn[2],$entry,false);
-            }    
+                $bookfilesusr[] = new BooksFile($startId, $endId,$entry,false);
+            }
         }
     }
 }
@@ -97,16 +139,18 @@ $localfilesUsr = array();
 if ($handle2 = opendir(LOCAL_FILES_DIR)) {
     while (false !== ($entry = readdir($handle2))) {   
 		if (strpos($entry, "-") !== false && substr($entry, -4) === ".zip") {
-        	$dt = str_replace(".zip", "", $entry);
-		    $dt = str_replace("f.n.", "f.n-", $dt);
-        	$dt = str_replace("f.fb2.", "f.n-", $dt);
-		    $fn = explode("-", $dt);
-			
+            $range = parseArchiveRange($entry);
+            if ($range === null) {
+                fwrite(STDERR, "Skipping " . LOCAL_FILES_DIR . "$entry: cannot read an id range from the name" . PHP_EOL);
+                continue;
+            }
+            [$startId, $endId] = $range;
+
             if (strpos($entry, "fb2") !== false) {
-                $bookfilesfb2[] = new BooksFile($fn[1], $fn[2],$entry,true);
+                $bookfilesfb2[] = new BooksFile($startId, $endId,$entry,true);
                 $localfilesfb2[$entry] = true;
 		    } else {
-                $bookfilesusr[] = new BooksFile($fn[1], $fn[2],$entry,true);
+                $bookfilesusr[] = new BooksFile($startId, $endId,$entry,true);
                 $localfilesUsr[$entry] = true;
             }
         }

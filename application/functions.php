@@ -1527,7 +1527,7 @@ function book_zip_filename($dbh, int $id, int $usr): string {
 	include_once(__DIR__ . '/zipindex.php');
 	$fromIndex = zip_index_lookup($id, $usr);
 	if ($fromIndex !== null) {
-		return $fromIndex;
+		return book_zip_resolve_path($fromIndex);
 	}
 
 	static $warned = false;
@@ -1538,7 +1538,64 @@ function book_zip_filename($dbh, int $id, int $usr): string {
 	$stmt = $dbh->prepare("SELECT filename FROM book_zip WHERE ? BETWEEN start_id AND end_id AND usr = ?");
 	$stmt->execute([$id, $usr]);
 	$row = $stmt->fetch();
-	return $row ? (string)$row->filename : '';
+	return $row ? book_zip_resolve_path((string)$row->filename) : '';
+}
+
+/**
+ * Turns a stored archive name into a path that can be opened.
+ *
+ * Current scans store the full path (/flibusta/... or /cache/local/...), but rows
+ * written by the retired tools/app_update_zip_list.php hold a bare file name, and an
+ * installation that has not rescanned since the upgrade still serves those - through
+ * the generated index, which build_zip_index.php copies straight out of the table.
+ * A bare name reaches realpath() and ZipArchive::open() as a relative path and fails
+ * everywhere at once, so resolve it here, in the one place every caller goes through.
+ */
+function book_zip_resolve_path(string $name): string {
+	if ($name === '' || strpos($name, '/') !== false) {
+		return $name;
+	}
+	static $warned = false;
+	if (!$warned) {
+		error_log("Flibusta: archive index holds bare file names ('$name') - resolving them against "
+			. LIBRARY_PATH . ' and ' . LOCAL_LIBRARY_PATH . '; run "Сканирование ZIP" to rebuild it.');
+		$warned = true;
+	}
+	foreach ([LIBRARY_PATH, LOCAL_LIBRARY_PATH] as $dir) {
+		if (is_file($dir . $name)) {
+			return $dir . $name;
+		}
+	}
+	return LIBRARY_PATH . $name;
+}
+
+/**
+ * The entry inside an fb2 archive that holds this book, or null when none does.
+ *
+ * Flibusta's fb2 archives name every entry "<id>.fb2"; the original file name that
+ * libfilename carries belongs to usr archives (there the entries really are
+ * Author_Title.rar and friends). Trusting libfilename for fb2 therefore names a
+ * non-existent entry, so ask the archive which of the candidates it actually has.
+ *
+ * Returns null when neither candidate is present - including the case where the
+ * libfilename value names an inner zip, which the caller unpacks instead.
+ */
+function fb2_archive_entry(string $zipPath, int $id, ?string $dbFilename): ?string {
+	$zip = new ZipArchive();
+	if ($zip->open($zipPath) !== true) {
+		error_log("Flibusta: cannot open archive $zipPath for book $id");
+		return null;
+	}
+	try {
+		foreach ([$id . '.fb2', $dbFilename] as $candidate) {
+			if ($candidate !== null && $candidate !== '' && $zip->locateName($candidate) !== false) {
+				return $candidate;
+			}
+		}
+		return null;
+	} finally {
+		$zip->close();
+	}
 }
 
 /**

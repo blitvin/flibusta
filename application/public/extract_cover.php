@@ -66,9 +66,22 @@ function cover_miss_is_fresh($id) {
 	if (!file_exists($marker)) {
 		return false;
 	}
-	$archive = CACHE_PATH . 'lib.b.attached.zip';
-	if (file_exists($archive) && filemtime($archive) > filemtime($marker)) {
-		return false;
+	$stamp = filemtime($marker);
+	// Anything that can make a cover reachable invalidates the miss: a fresh cover
+	// archive, a rescan that changed which zip holds the book (or repaired a broken
+	// index), and a local copy of the book appearing in /cache/local. Without these
+	// a miss recorded while something was misconfigured outlived the fix and could
+	// only be cleared by wiping /cache/covers by hand.
+	include_once(ROOT_PATH . 'zipindex.php');
+	$newerThanMarker = [
+		CACHE_PATH . 'lib.b.attached.zip',
+		ZIP_INDEX_FILE,
+		LOCAL_LIBRARY_PATH . intval($id) . '.fb2',
+	];
+	foreach ($newerThanMarker as $path) {
+		if (file_exists($path) && filemtime($path) > $stamp) {
+			return false;
+		}
 	}
 	return true;
 }
@@ -310,16 +323,29 @@ if ($type == 'fb2') {
 			error_log("extract_cover: fb2 $id: no book_zip entry and no local file");
 			cover_placeholder($id);
 		}
-		$filename = $metaFilename ?? trim("$id.fb2");
-		if (strtolower(pathinfo($filename, PATHINFO_EXTENSION)) === 'zip') {
-			resolve_inner_zip_book($zip_name, $id, $filename, 'fb2');
+		// Which entry inside the archive holds this book? In an fb2 archive it is
+		// always "<id>.fb2" - the original file name belongs to usr archives, and
+		// that is what libfilename stores. Preferring libfilename here named an
+		// entry that does not exist, XMLReader could not open it, and every such
+		// book silently got a placeholder plus a permanent miss marker. Ask the
+		// archive instead of guessing; book_open_source() resolves it the same way.
+		$entry = fb2_archive_entry($zip_name, (int)$id, $metaFilename);
+		if ($entry === null && $metaFilename !== null
+			&& strtolower(pathinfo($metaFilename, PATHINFO_EXTENSION)) === 'zip') {
+			// The book is packed as a one-book zip inside the outer archive.
+			resolve_inner_zip_book($zip_name, $id, $metaFilename, 'fb2');
 			if (file_exists($localFb2)) {
 				extractFb2CoverFromZip($localFb2, $id);
 			} else {
-				extractFb2CoverFromZip('zip://' . realpath($zip_name) . '#' . $filename, $id);
+				error_log("extract_cover: fb2 $id: inner zip '$metaFilename' could not be unpacked from $zip_name");
+				cover_placeholder($id);
 			}
+		} elseif ($entry === null) {
+			$tried = "$id.fb2" . ($metaFilename !== null ? ", '$metaFilename'" : '');
+			error_log("extract_cover: fb2 $id: no matching entry in $zip_name (tried $tried)");
+			cover_placeholder($id);
 		} else {
-			extractFb2CoverFromZip('zip://' . realpath($zip_name) . '#' . $filename, $id);
+			extractFb2CoverFromZip('zip://' . realpath($zip_name) . '#' . $entry, $id);
 		}
 	}
 } elseif ($type == 'epub') {
@@ -346,6 +372,11 @@ if ($small) {
 	$fname = CACHE_PATH . "covers/$id.jpg";
 }
 if (file_exists($fname)) {
+	// A cover was just produced, so drop any miss recorded earlier rather than
+	// leaving a marker that contradicts the file next to it. Only here, not on
+	// the cached path at the top of the file: that one serves every cover on
+	// every page and must not pay for a syscall that changes nothing.
+	@unlink(cover_miss_marker($id));
 	lastm($fname);
 } else {
 	// The extractors above have already logged why they came up empty. Record
