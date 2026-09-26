@@ -11,9 +11,77 @@ $authUrlSample = $host ? $scheme . '://username:password@' . $host . $opdsPath :
 
 echo "<h4>Справка</h4><br><br>";
 
-echo "<h5>Flibusta-at-home blog</h5>";
-echo "<p>Блог проекта Flibusta-at-home: <a href='https://elfwood.org/elfblog/ru/topics/flibusta-at-home/'>https://elfwood.org/elfblog/ru/topics/flibusta-at-home/</a> содержит различные сведения по установке, администрированию и использованию flibusta-at-home.</p>";
-echo "<p>Разработчики публикуют там объяснеиния, FAQ и инструкции по использованию. Если у Вас  возникли проблемы, возможно там содержатся способы их устранения.</p>";
+// ------------------------------------------------------------------ блог проекта
+// Серия статей на блоге отвечает на большую часть того, с чем сюда приходят, но она
+// длинная, поэтому полезные статьи перечислены явно. Список — данные: новая статья
+// это одна строка, а группа для администратора скрывается от читателя так же, как
+// renderer.php скрывает Сервис/Пользователи/Добавить.
+$blogBase  = 'https://elfwood.org/elfblog/ru/';
+$blogIndex = $blogBase . 'topics/flibusta-at-home/';
+
+$blogGroups = [
+	['title' => '', 'admin' => false, 'posts' => [
+		['flibusta-at-home-overview', 'Обзор Flibusta-at-home',
+		 'что это, как устроено и какие сценарии использования бывают'],
+	]],
+	['title' => 'Если что-то не работает', 'admin' => false, 'posts' => [
+		['flibusta-at-home-troubleshooting', 'Устранение неполадок',
+		 'справочник «симптом → причина → что делать»: контейнер не стартует, вход по кругу, книга не открывается, нет обложек'],
+	]],
+	['title' => 'Читателям', 'admin' => false, 'posts' => [
+		['flibusta-at-home-settings', 'Настройки читателя',
+		 'пароль, страница после входа, режим открытия книги, скрытые жанры, «Запомнить меня», полка и позиция чтения'],
+		['flibusta-at-home-opds', 'OPDS и читалки',
+		 'адрес каталога, аутентификация, форматы для Kindle и Kobo, особенности популярных приложений'],
+	]],
+	['title' => 'Администраторам библиотеки', 'admin' => true, 'posts' => [
+		['flibusta-at-home-install', 'Установка шаг за шагом',
+		 'чеклист развёртывания в Docker: директории, секреты, сети, подключение к reverse proxy, первый запуск'],
+		['flibusta-at-home-env', 'Переменные окружения docker-compose',
+		 'справочник по всем переменным, секретам, томам и сетям, значения по умолчанию и типичные ошибки'],
+		['flibusta-at-home-archives', 'Архивы книг: где взять и как они устроены',
+		 'торренты Флибусты, что означают имена архивов, как строится индекс архивов и как раскладывать файлы по дискам'],
+		['flibusta-at-home-remote-access', 'Доступ к библиотеке из интернета',
+		 'проброс портов, Cloudflare Tunnel, Tailscale, VPS как точка входа; замечания для тех, кто в России'],
+		['flibusta-at-home-fail2ban', 'fail2ban и лог попыток входа',
+		 'формат лога, фильтр и jail, особенности бана трафика к контейнерам, ротация через logrotate'],
+		['flibusta-at-home-addbook', 'Добавление своих книг',
+		 'раздел «Добавить» подробно: распознавание формата, поиск дубликатов, что будет с книгой при следующем импорте дампа'],
+		['flibusta-at-home-scripts', 'Сервисные скрипты и cron',
+		 'запуск /tools через docker exec -u www-data, автоматическое обновление по расписанию, доступ к psql'],
+		['flibusta-at-home-backup', 'Обновление версии, бэкап и восстановление',
+		 'что нужно бэкапить, а что восстановится само; как обновлять образ и откатываться; как перенести библиотеку'],
+		['flibusta-at-home-performance', 'Кэш, Redis и производительность',
+		 'что именно кэшируется, как включить Redis на работающей библиотеке и как проверить результат'],
+	]],
+];
+
+echo "<h5>Блог проекта Flibusta-at-home</h5>";
+echo "<p>Руководство по установке, администрированию и использованию библиотеки — "
+	. "<a href='" . htmlspecialchars($blogIndex, ENT_QUOTES, 'UTF-8') . "' target='_blank' rel='noopener noreferrer'>все статьи серии</a>."
+	. " Это внешний сайт: ссылки открываются в новой вкладке и требуют доступа в интернет.</p>";
+
+foreach ($blogGroups as $group) {
+	if ($group['admin'] && empty($_SESSION['is_admin'])) {
+		continue;
+	}
+	if ($group['title'] !== '') {
+		echo "<h6>" . htmlspecialchars($group['title'], ENT_QUOTES, 'UTF-8') . "</h6>";
+	}
+	echo "<ul class='list-unstyled ms-3'>";
+	foreach ($group['posts'] as [$slug, $title, $note]) {
+		$url = $blogBase . 'posts/' . $slug . '/';
+		echo "<li class='mb-2'><a href='" . htmlspecialchars($url, ENT_QUOTES, 'UTF-8') . "' target='_blank' rel='noopener noreferrer'>"
+			. htmlspecialchars($title, ENT_QUOTES, 'UTF-8') . "</a> — <span class='text-muted'>"
+			. htmlspecialchars($note, ENT_QUOTES, 'UTF-8') . "</span></li>";
+	}
+	echo "</ul>";
+}
+
+echo "<p>Если ответа там не нашлось — вопросы и сообщения об ошибках в "
+	. "<a href='https://github.com/blitvin/flibusta/issues' target='_blank' rel='noopener noreferrer'>issues на GitHub</a>.</p>";
+echo "<hr style='width:50%; margin:auto;'/><br><br><br>";
+
 echo "<h5>OPDS</h5>";
 echo "<p>OPDS (Open Publication Distribution System) — это стандартный каталогный протокол для электронных ридеров.
  Он позволяет подключаться к библиотеке как к каталогу, просматривать книги и загружать их из мобильного приложения.</p>";
