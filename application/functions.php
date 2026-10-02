@@ -9,6 +9,16 @@ function h($s) {
 }
 
 /**
+ * URL of a file under public/ stamped with its mtime. nginx serves static files
+ * without Cache-Control, so browsers cache them heuristically for days and keep
+ * the old stylesheet after an upgrade; a new stamp is a new URL.
+ */
+function asset_url($webroot, $path) {
+	$mtime = @filemtime(ROOT_PATH . 'public/' . $path);
+	return $webroot . '/' . $path . ($mtime ? '?v=' . $mtime : '');
+}
+
+/**
  * Plain text to paragraphs.
  *
  * The input is the contents of a book file, i.e. untrusted, so each line is
@@ -222,9 +232,22 @@ function book_small_pg($book, $webroot='',$full = false) {
 	}
 	$current_user_id = isset($_SESSION['user_id']) ? intval($_SESSION['user_id']) : 0;
 	echo "<div class='col-sm-2 col-6 mb-3'>";
-	echo "<div style='height: 100%' class='cover rounded text-center d-flex align-items-end flex-column'>";
-	echo "<a class='w-100' href='$webroot/book/view/$book->bookid'>";
-	echo "<img class='w-100 card-image rounded-top' src='$webroot/extract_cover.php?sid=$book->bookid' />";
+	$bid = intval($book->bookid);
+	$title = h($book->title);
+	// A miss recorded earlier means the tile starts in its coverless layout and
+	// does not flash the empty cover box; onload/onerror below correct the guess
+	// either way, so a stale marker costs nothing.
+	$no_cover = file_exists(CACHE_PATH . "covers/$bid.none")
+		&& !file_exists(CACHE_PATH . "covers/$bid-small.jpg") ? ' no-cover' : '';
+	echo "<div class='book-tile$no_cover rounded text-center d-flex flex-column'>";
+	echo "<a class='w-100' href='$webroot/book/view/$bid' title='$title'>";
+	// nofallback: a book without a cover gets a 404 instead of the stock
+	// placeholder, so the tile can switch to its title-on-cover layout.
+	echo "<div class='book-tile-cover rounded-top'>"
+	   . "<img src='$webroot/extract_cover.php?sid=$bid&amp;nofallback=1' alt=''"
+	   . " onload=\"this.closest('.book-tile').classList.remove('no-cover')\""
+	   . " onerror=\"this.closest('.book-tile').classList.add('no-cover')\" />"
+	   . "<div class='book-tile-cover-title'>$title</div></div>";
 
 	$dt = book_date($book->time);
 	if (trim($book->filetype) == 'fb2') {
@@ -235,8 +258,12 @@ function book_small_pg($book, $webroot='',$full = false) {
 
 	if ($book->year != 0) {
 		$year = $book->year;
+		$year_title = '';
 	} else {
-		$year = $dt;
+		// "без года", the bibliographic mark; the date the book was added
+		// goes to the tooltip instead of crowding the narrow button.
+		$year = 'б. г.';
+		$year_title = " title='" . h('Год издания неизвестен' . ($dt !== '' ? ", добавлена $dt" : '')) . "'";
 	}
 
 	$show_fav_button = false;
@@ -251,13 +278,21 @@ function book_small_pg($book, $webroot='',$full = false) {
 		}
 	}
 
-	echo "<div>" . h($book->title) . "</div></a>";
+	echo "<div class='book-tile-title'>$title</div>";
+	// Coverless tiles show the title on the cover box, so the strip below it
+	// carries the authors instead. Rendered for every tile because the cover
+	// may only turn out missing in the browser; CSS shows it for .no-cover.
+	$author_names = [];
+	foreach (book_header_lists($dbh, $bid)['authors'] as $a) {
+		$name = trim("$a->firstname $a->lastname");
+		$author_names[] = $name !== '' ? $name : trim((string)$a->nickname);
+	}
+	echo "<div class='book-tile-authors'>" . h(implode(', ', array_filter($author_names))) . "</div></a>";
 
 	// Row 1: year + download (split dropdown for fb2, plain button for others)
 	echo "<div class='btn-group w-100 mt-auto' role='group'>";
-	echo "<button type='button' class='btn btn-outline-secondary btn-sm'>$year</button>";
+	echo "<button type='button' class='btn btn-outline-secondary btn-sm'$year_title>$year</button>";
 	if (trim($book->filetype) === 'fb2') {
-		$bid = intval($book->bookid);
 		echo "<a href='$fhref' class='btn btn-outline-success btn-sm'>fb2</a>";
 		echo "<div class='btn-group btn-group-sm' role='group'>";
 		echo "<button type='button' class='btn btn-outline-success btn-sm dropdown-toggle dropdown-toggle-split'"
@@ -283,8 +318,8 @@ function book_small_pg($book, $webroot='',$full = false) {
 
 	// Row 2: О книге + Читать + (optional) Избранное
 	echo "<div class='btn-group w-100 mt-1' role='group'>";
-	echo "<a href='$webroot/book/view/$book->bookid/withannotation' class='btn btn-outline-info btn-sm'>О книге</a>";
-	echo "<a href='$webroot/book/view/$book->bookid/contentonly' class='btn btn-outline-primary btn-sm'>Читать</a>";
+	echo "<a href='$webroot/book/view/$bid/withannotation' class='btn btn-outline-info btn-sm'>О книге</a>";
+	echo "<a href='$webroot/book/view/$bid/contentonly' class='btn btn-outline-primary btn-sm'>Читать</a>";
 	if ($show_fav_button) {
 		$fav_id = $book->bookid;
 		echo "<form method='POST' action='' style='display:inline;'>
@@ -306,7 +341,7 @@ function book_info_pg($book, $webroot = '', $full = false) {
 	$current_user_id = isset($_SESSION['user_id']) ? intval($_SESSION['user_id']) : 0;
 	echo "<div class='hic card mb-3' itemscope='' itemtype='http://schema.org/Book'>";
 //	echo "<div class='card-header'>";
-	echo "<h4 class='rounded-top' style='background: #d0d0d0;'><a class='book-link' href='$webroot/book/view/" . intval($book->bookid) . "'><i class='fas'></i> " . h($book->title) . "</h4></a>";
+	echo "<h4 class='rounded-top' style='background: #d0d0d0;'><a class='book-link' href='$webroot/book/view/" . intval($book->bookid) . "' title='" . h($book->title) . "'><i class='fas'></i> " . h($book->title) . "</a></h4>";
 //	echo "</div>";
 	echo "<div class='card-body'>";
 	echo "<div class='row'>";
@@ -322,8 +357,12 @@ function book_info_pg($book, $webroot = '', $full = false) {
 
 	if ($book->year != 0) {
 		$year = $book->year;
+		$year_title = '';
 	} else {
-		$year = $dt;
+		// "без года", the bibliographic mark; the date the book was added
+		// goes to the tooltip instead of crowding the narrow button.
+		$year = 'б. г.';
+		$year_title = " title='" . h('Год издания неизвестен' . ($dt !== '' ? ", добавлена $dt" : '')) . "'";
 	}
 
 	$fav = 'btn-outline-secondary';
@@ -337,7 +376,7 @@ function book_info_pg($book, $webroot = '', $full = false) {
 
 	// Row 1: year + download (split dropdown for fb2, plain button for others)
 	echo "<div class='btn-group w-100 mt-1' role='group'>";
-	echo "<button type='button' class='btn btn-outline-secondary btn-sm'>$year</button>";
+	echo "<button type='button' class='btn btn-outline-secondary btn-sm'$year_title>$year</button>";
 	if (trim($book->filetype) === 'fb2') {
 		$bid = intval($book->bookid);
 		echo "<a href='$fhref' class='btn btn-outline-success btn-sm'>fb2</a>";

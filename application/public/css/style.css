@@ -94,6 +94,92 @@ h4 {
 	max-height: 400px;
 }
 
+/* Grid tile from book_small_pg(). Not .cover: that max-height is for an image,
+   and on the tile it let a two-line title push the buttons out of the box. */
+.book-tile {
+	height: 100%;
+	box-shadow: 0 .125rem .25rem rgba(0,0,0,.9);
+}
+
+/* Every cover gets the same 2:3 box so tiles in a row line up. */
+.book-tile-cover {
+	position: relative;
+	aspect-ratio: 2 / 3;
+	overflow: hidden;
+}
+
+.book-tile-cover img {
+	display: block;
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}
+
+/* The full title stays in the link's title attribute as a hover tooltip. */
+.book-tile-title,
+.book-tile-cover-title,
+.book-tile-authors {
+	display: -webkit-box;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 2;
+	line-clamp: 2;
+	overflow: hidden;
+	/* Pages are lang="ru", so long words hyphenate instead of breaking anywhere. */
+	hyphens: auto;
+	overflow-wrap: break-word;
+}
+
+/* Narrow tiles (col-sm-2): buttons shrink and clip their text rather than
+   pushing the favourite button out of the tile. */
+.book-tile .btn-group > .btn {
+	min-width: 0;
+	padding-left: .25rem;
+	padding-right: .25rem;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.book-tile .btn-group > form {
+	flex: 0 0 auto;
+}
+
+/* Without a cover the title moves into the cover box, starting at the top. */
+.book-tile-cover-title,
+.book-tile-authors {
+	display: none;
+}
+
+.book-tile.no-cover .book-tile-cover {
+	/* The stock placeholder picture, washed out more at the top where the
+	   title sits so the text stays readable. */
+	background:
+		linear-gradient(rgba(244,236,216,.92), rgba(244,236,216,.6)),
+		url(../i/nocover.png) center / cover no-repeat;
+	color: #542a00;
+	padding: .75rem .5rem;
+}
+
+.book-tile.no-cover .book-tile-cover img,
+.book-tile.no-cover .book-tile-title {
+	display: none;
+}
+
+.book-tile.no-cover .book-tile-authors {
+	display: -webkit-box;
+	font-size: .85rem;
+	color: #6c757d;
+}
+
+.book-tile.no-cover .book-tile-cover-title {
+	display: -webkit-box;
+	-webkit-line-clamp: 7;
+	line-clamp: 7;
+	font-size: 1.05rem;
+	font-weight: 500;
+	line-height: 1.3;
+}
+
 .book {
 	text-align: justify;
 }

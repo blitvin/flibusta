@@ -34,6 +34,7 @@ if ($url->mod !== 'service') {
 	// libbook.title), and "</title><script>" would break out of RCDATA.
 	echo "<title>" . htmlspecialchars($title, ENT_QUOTES, 'UTF-8') . "</title>";
 	include_once(ROOT_PATH . 'webroot.php');
+	$style_css = asset_url($webroot, 'css/style.css');
 echo <<< __HTML
 
 <link href="$webroot/bootstrap/css/bootstrap.min.css" rel="stylesheet">
@@ -42,7 +43,7 @@ echo <<< __HTML
 <link rel="icon" href="$webroot/favicon.svg" sizes="any" type="image/svg+xml">
 
 <link href="$webroot/css/all.min.css" rel="stylesheet">
-<link href="$webroot/css/style.css" rel="stylesheet">
+<link href="$style_css" rel="stylesheet">
 __HTML
 ?>
 <style>

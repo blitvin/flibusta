@@ -92,6 +92,19 @@ function cover_placeholder($id) {
 		error_log('extract_cover: cannot write miss marker for book ' . intval($id)
 			. ' — is ' . CACHE_PATH . 'covers/ writable?');
 	}
+	serve_placeholder();
+}
+
+/**
+ * Answer "no cover". Callers that draw their own coverless layout (book tiles)
+ * ask with ?nofallback and get an empty 404, which fires the img's onerror;
+ * everyone else (OPDS, the book page) gets the stock placeholder image.
+ */
+function serve_placeholder() {
+	if (isset($_GET['nofallback'])) {
+		http_response_code(404);
+		exit;
+	}
 	echo file_get_contents('/application/none.jpg');
 	exit;
 }
@@ -251,8 +264,7 @@ if ($small) {
 // Nothing was found last time and nothing has changed since: skip the lookup
 // and the two queries it needs.
 if (cover_miss_is_fresh($id)) {
-	echo file_get_contents('/application/none.jpg');
-	die();
+	serve_placeholder();
 }
 
 // Most fb2 books carry no cover of their own; Flibusta keeps those images in
