@@ -1738,7 +1738,7 @@ function book_reviews($dbh, int $id): array {
 function user_prefs($dbh, int $userId): object {
 	if ($userId <= 0) {
 		return (object)['login_redirect' => null, 'author_default_tab' => null,
-			'book_view_mode' => null, 'excluded_genres' => []];
+			'book_view_mode' => null, 'theme' => null, 'excluded_genres' => []];
 	}
 	// Request-scope memo kept in a global, not a function static, so that
 	// user_prefs_invalidate() can clear it too - a save and the re-render that
@@ -1749,7 +1749,7 @@ function user_prefs($dbh, int $userId): object {
 
 	$prefs = cache_remember("user:$userId:prefs", 86400, static function () use ($dbh, $userId) {
 		try {
-			$stmt = $dbh->prepare("SELECT login_redirect, author_default_tab, book_view_mode
+			$stmt = $dbh->prepare("SELECT login_redirect, author_default_tab, book_view_mode, theme
 				FROM user_settings WHERE user_id = ?");
 			$stmt->execute([$userId]);
 			$row = $stmt->fetch(PDO::FETCH_OBJ);
@@ -1767,6 +1767,7 @@ function user_prefs($dbh, int $userId): object {
 				'login_redirect'     => $row->login_redirect ?? null,
 				'author_default_tab' => $row->author_default_tab ?? null,
 				'book_view_mode'     => $row->book_view_mode ?? null,
+				'theme'              => $row->theme ?? null,
 				'excluded_genres'    => $genres,
 			];
 		} catch (Exception $e) {
@@ -1778,7 +1779,7 @@ function user_prefs($dbh, int $userId): object {
 
 	if (!is_object($prefs)) {
 		$prefs = (object)['login_redirect' => null, 'author_default_tab' => null,
-			'book_view_mode' => null, 'excluded_genres' => []];
+			'book_view_mode' => null, 'theme' => null, 'excluded_genres' => []];
 	}
 	$GLOBALS['__flibusta_prefs'][$userId] = $prefs;
 	return $prefs;
@@ -1788,6 +1789,45 @@ function user_prefs($dbh, int $userId): object {
 function user_prefs_invalidate(int $userId): void {
 	unset($GLOBALS['__flibusta_prefs'][$userId]);
 	cache_del("user:$userId:prefs");
+}
+
+const THEMES = ['auto', 'light', 'dark'];
+
+/**
+ * Colour theme for this request: the user's choice from Настройки, 'auto' for
+ * anonymous visitors. `?? 'auto'` also covers prefs cached before the theme
+ * column existed.
+ */
+function current_theme($dbh): string {
+	$theme = 'auto';
+	if (!empty($_SESSION['user_id'])) {
+		$theme = user_prefs($dbh, (int)$_SESSION['user_id'])->theme ?? 'auto';
+	}
+	return in_array($theme, THEMES, true) ? $theme : 'auto';
+}
+
+/**
+ * Inline <head> script that sets data-bs-theme on <html> before first paint.
+ * 'auto' follows the OS setting and tracks changes to it; the settings page calls
+ * flibustaSetTheme() after a save, because the head of that page was already sent.
+ */
+function theme_head_script(string $theme): string {
+	$theme = in_array($theme, THEMES, true) ? $theme : 'auto';
+	return <<< __HTML
+<script>
+(function () {
+	var pref = '$theme', mq = window.matchMedia('(prefers-color-scheme: dark)');
+	function apply() {
+		document.documentElement.setAttribute('data-bs-theme',
+			pref === 'auto' ? (mq.matches ? 'dark' : 'light') : pref);
+	}
+	window.flibustaSetTheme = function (p) { pref = p; apply(); };
+	apply();
+	mq.addEventListener('change', function () { if (pref === 'auto') apply(); });
+})();
+</script>
+
+__HTML;
 }
 
 /**

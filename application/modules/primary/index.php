@@ -94,9 +94,9 @@ $xgenres_active = $xgenres && !isset($_SESSION['xgenres_off']);
 $fcontent .= '<div class="btn-group mt-1 me-1" role="group">';
 if (isset($_SESSION['fb2'])) {
 	$filter .= "AND filetype='fb2' ";
-	$fcontent .= "<a class='btn bg-dark text-white bg-opacity-90 text-white' href='$webroot/?fb2'>Только FB2</a> ";
+	$fcontent .= "<a class='btn bg-fl-format text-white bg-opacity-90 text-white' href='$webroot/?fb2'>Только FB2</a> ";
 } else {
-	$fcontent .= "<a class='btn bg-dark text-white bg-opacity-50 text-white' href='$webroot/?fb2=1'>Все форматы</a> ";
+	$fcontent .= "<a class='btn bg-fl-format text-white bg-opacity-50 text-white' href='$webroot/?fb2=1'>Все форматы</a> ";
 }
 
 if (isset($_SESSION['ru'])) {

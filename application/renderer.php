@@ -15,6 +15,10 @@ if ($url->mod !== 'service') {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Техобслуживание — Библиотека</title>
 <link href="$webroot/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+__HTML;
+		// 'auto' only: no DB access while the database is being rebuilt.
+		echo theme_head_script('auto');
+		echo <<< __HTML
 </head>
 <body style="background-color: #343a40;">
 <div class="container py-5">
@@ -33,13 +37,17 @@ __HTML;
 		die();
 	}
 }
+$theme = current_theme($dbh);
+// An explicit choice is rendered server-side too, so it holds even without JS.
+$theme_attr = ($theme === 'auto') ? '' : " data-bs-theme='$theme'";
 ?>
 <!doctype html>
-<html lang="ru">
+<html lang="ru"<?= $theme_attr ?>>
 <head>
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<?= theme_head_script($theme) ?>
 
 <?php
 	if ($url->description != '') {
@@ -67,33 +75,6 @@ echo <<< __HTML
 <link href="$style_css" rel="stylesheet">
 __HTML
 ?>
-<style>
-.pagination>li.active>a {
-  background-color: #777 !important;
-  border-color: #6d6d6d !important;
-}
-
-.badge {
-    white-space: break-spaces;
-}
-
-.author {
-        background: #dddddd;
-}
-
-.author a {
-	color: #333;
-	line-height: 24px;
-	padding-left: 3px;
-}
-
-.contact {
-         width: 24px;
-         height: 24px;
-}
-
-</style>
-
 </head>
 <?php
 // Active menu entry, keyed by menu item. Bootstrap 5 highlights
@@ -113,7 +94,7 @@ $is_admin = !empty($_SESSION['is_admin']);
 
 echo <<< __HTML
 
-<body style='background-color: #343a40;'>
+<body>
 
 <div class="container whb">
 <nav class="navbar navbar-expand-lg navbar-dark rounded-bottom shadow" style="background-color: #3e3b6c;">

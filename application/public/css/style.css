@@ -1,5 +1,48 @@
+/* Colours that are not Bootstrap's own. Light values first; the dark theme
+   (data-bs-theme="dark" on <html>, see theme_head_script()) overrides them.
+   Anything themable should use these or Bootstrap's --bs-* variables, never a
+   literal colour. */
+:root {
+	--fl-page-bg: #343a40;
+	--fl-title-bar: #d0d0d0;
+	--fl-block-bg: #faf4ea;
+	--fl-block-border: #e4dcd8;
+	--fl-accent-text: #542a00;
+	--fl-heading: #334455;
+	--fl-chip-bg: #dddddd;
+	--fl-chip-text: #333;
+	--fl-muted-bg: #eee;
+	--fl-rule: rgb(48,49,51);
+	--fl-pager-active: #777;
+	--fl-format-rgb: 33, 37, 41;
+}
+[data-bs-theme="dark"] {
+	--fl-page-bg: #111315;
+	--fl-title-bar: #3a3f45;
+	--fl-block-bg: #2a2825;
+	--fl-block-border: #47413b;
+	--fl-accent-text: #e3bc8f;
+	--fl-heading: #a9bfd4;
+	--fl-chip-bg: #3a3f45;
+	--fl-chip-text: #dee2e6;
+	--fl-muted-bg: #2f343a;
+	--fl-rule: #8a9096;
+	--fl-pager-active: #5c636a;
+	--fl-format-rgb: 108, 117, 125;
+}
+
+body {
+	background-color: var(--fl-page-bg);
+}
+
 .whb {
-	background-color: #fff;
+	background-color: var(--bs-body-bg);
+}
+
+/* "Все форматы / Только FB2" filter: bg-dark would vanish on a dark page.
+   Works with Bootstrap's bg-opacity-* utilities like the bg-* classes do. */
+.bg-fl-format {
+	background-color: rgba(var(--fl-format-rgb), var(--bs-bg-opacity, 1)) !important;
 }
 
 section title {
@@ -9,9 +52,9 @@ section title {
 
 .block {
     width: 100%;
-    background: #faf4ea;
+    background: var(--fl-block-bg);
     padding: 0.3rem 0.3rem;
-    border: 1px solid #e4dcd8;
+    border: 1px solid var(--fl-block-border);
     position: relative;
 }
 
@@ -25,7 +68,7 @@ section title {
 }
 
 .block .info {
-    color: #542a00;
+    color: var(--fl-accent-text);
     margin-bottom: 5px;
     font-size: 14px;
     line-height: 20px;
@@ -35,12 +78,12 @@ section title {
 .info dt {
     float: left;
     clear: left;
-    color: #000;
+    color: var(--bs-emphasis-color);
     margin: 0 3px 0 0;
 }
 
 .bottom-line {
-    border-top: 1px dashed #e4dcd8;
+    border-top: 1px dashed var(--fl-block-border);
     margin-top: 5px;
     margin-bottom: 5px;
 }
@@ -52,8 +95,30 @@ section title {
     border-radius: 2px;
     text-decoration: none;
     margin: 2px 4px 2px 0;
-    color: #542a00;
+    color: var(--fl-accent-text);
     padding: 2px;
+    background: var(--fl-chip-bg);
+}
+
+.author a {
+	color: var(--fl-chip-text);
+	line-height: 24px;
+	padding-left: 3px;
+}
+
+/* Author photo inside an .author chip. */
+.contact {
+	width: 24px;
+	height: 24px;
+}
+
+.badge {
+	white-space: break-spaces;
+}
+
+.pagination > li.active > a {
+	background-color: var(--fl-pager-active) !important;
+	border-color: var(--fl-pager-active) !important;
 }
 
 section {
@@ -74,12 +139,12 @@ a:hover, a:visited, a:link, a:active {
 	text-decoration: none;
 }
 h3 {
-	color: #334455;
+	color: var(--fl-heading);
 	text-decoration: none;
 }
 
 .book-link {
-	color: #542a00;
+	color: var(--fl-accent-text);
 }
 .card-body {
 	padding: 0.3rem 0.3rem;
@@ -99,10 +164,10 @@ h4 {
 
 /* One-line footer under the page content. */
 .site-footer {
-	border-top: 1px solid #dee2e6;
+	border-top: 1px solid var(--bs-border-color);
 }
 .site-footer a {
-	color: #6c757d;
+	color: var(--bs-secondary-color);
 	text-decoration: none;
 }
 .site-footer a:hover {
@@ -111,7 +176,7 @@ h4 {
 
 /* Grey title strip on top of cards (book cards, service, users, addbook). */
 .card-title-bar {
-	background: #d0d0d0;
+	background: var(--fl-title-bar);
 }
 
 /* Book card from book_info_pg(). */
@@ -215,7 +280,7 @@ h4 {
 .book-tile.no-cover .book-tile-authors {
 	display: -webkit-box;
 	font-size: .85rem;
-	color: #6c757d;
+	color: var(--bs-secondary-color);
 }
 
 .book-tile.no-cover .book-tile-cover-title {
@@ -271,7 +336,7 @@ canvas {
 	right: 5%;
 	width: 90%;
 	height: 1px;
-	background-image: linear-gradient(to right, transparent, rgb(48,49,51), transparent);
+	background-image: linear-gradient(to right, transparent, var(--fl-rule), transparent);
 }
 
 .div-arrow-down:after {
@@ -283,9 +348,9 @@ canvas {
 	width: 14px;
 	height: 14px;
 	transform: rotate(45deg);
-	background-color: white;
-	border-bottom: 1px solid rgb(48,49,51);
-	border-right: 1px solid rgb(48,49,51);
+	background-color: var(--bs-body-bg);
+	border-bottom: 1px solid var(--fl-rule);
+	border-right: 1px solid var(--fl-rule);
 }
 
 .div-tab-down:after {
@@ -296,10 +361,10 @@ canvas {
 	left: calc(50% - 10px);
 	width: 20px;
 	height: 14px;
-	background-color: white;
-	border-bottom: 1px solid rgb(48,49,51);
-	border-left: 1px solid rgb(48,49,51);
-	border-right: 1px solid rgb(48,49,51);
+	background-color: var(--bs-body-bg);
+	border-bottom: 1px solid var(--fl-rule);
+	border-left: 1px solid var(--fl-rule);
+	border-right: 1px solid var(--fl-rule);
 	border-radius: 0 0 8px 8px;
 }
 
@@ -311,9 +376,9 @@ canvas {
 	left: calc(50% - 7px);
 	width: 14px;
 	height: 12px;
-	background-color: white;
-	border-left: 1px solid rgb(48,49,51);
-	border-right: 1px solid rgb(48,49,51);
+	background-color: var(--bs-body-bg);
+	border-left: 1px solid var(--fl-rule);
+	border-right: 1px solid var(--fl-rule);
 }
 
 .div-dot:after {
@@ -325,16 +390,16 @@ canvas {
 	width: 18px;
 	height: 18px;
 	background-color: #aaa ;
-	border: 1px solid rgb(48,49,51);
+	border: 1px solid var(--fl-rule);
 	border-radius: 50%;
-	box-shadow: inset 0 0 0 2px white,
-					0 0 0 4px white;
+	box-shadow: inset 0 0 0 2px var(--bs-body-bg),
+					0 0 0 4px var(--bs-body-bg);
 }
 
 title  {
-	text-shadow: 0 2px white, 0 3px #777;
+	text-shadow: 0 2px var(--bs-body-bg), 0 3px #777;
 	margin: 1em 0 0.5em 0;
-	color: #343434;
+	color: var(--bs-emphasis-color);
 	font-family: 'Open Sans Condensed', sans-serif;
 	font-size: 1.5em;
 	line-height: 1.8em;
@@ -351,21 +416,21 @@ section section title {
 	text-align: left;
 	border-top-left-radius: .25rem!important;
 	border-top-right-radius: .25rem!important;
-	background: #ddd;
+	background: var(--fl-chip-bg);
 	display: inline-block;
 	padding: 0.25em;
-	border-top: 1px solid #ddd;
-	border-right: 1px solid #ddd;
-	border-left: 1px solid #ddd;
+	border-top: 1px solid var(--fl-chip-bg);
+	border-right: 1px solid var(--fl-chip-bg);
+	border-left: 1px solid var(--fl-chip-bg);
 }
 
 section1 section p {
 	padding: 0.5em;
-	border: 1px solid #ddd;
+	border: 1px solid var(--fl-chip-bg);
 	border-bottom-left-radius: .25rem!important;
 	border-bottom-right-radius: .25rem!important;
 	border-top-right-radius: .25rem!important;
-	background: #eee;
+	background: var(--fl-muted-bg);
 }
 
 .reader p {
@@ -373,7 +438,7 @@ section1 section p {
 	font-size: 1.2rem;
 	font-weight: 400;
 	line-height: 1.7;
-	color: #333;
+	color: var(--bs-body-color);
 	font-family: sans-serif;
 	margin-bottom: 15px;
 }

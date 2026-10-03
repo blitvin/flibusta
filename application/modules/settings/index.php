@@ -17,6 +17,7 @@ $prefs = user_prefs($dbh, $current_user_id);
 $login_redirect     = $prefs->login_redirect     ?? 'default';
 $author_default_tab = $prefs->author_default_tab ?? 'alpha';
 $book_view_mode     = $prefs->book_view_mode     ?? 'contentonly';
+$theme              = $prefs->theme              ?? 'auto';
 
 $excluded = $prefs->excluded_genres;
 
@@ -74,18 +75,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!in_array($new_book_mode, ['withannotation', 'contentonly'], true)) {
             $new_book_mode = $book_view_mode;
         }
-        $stmt = $dbh->prepare("INSERT INTO user_settings (user_id, login_redirect, author_default_tab, book_view_mode)
-            VALUES (?, ?, ?, ?)
+        $new_theme = $_POST['theme'] ?? $theme;
+        if (!in_array($new_theme, THEMES, true)) {
+            $new_theme = $theme;
+        }
+        $stmt = $dbh->prepare("INSERT INTO user_settings (user_id, login_redirect, author_default_tab, book_view_mode, theme)
+            VALUES (?, ?, ?, ?, ?)
             ON CONFLICT (user_id) DO UPDATE SET login_redirect     = EXCLUDED.login_redirect,
                                                 author_default_tab = EXCLUDED.author_default_tab,
-                                                book_view_mode     = EXCLUDED.book_view_mode");
-        $stmt->execute([$current_user_id, $new_redirect, $new_author_tab, $new_book_mode]);
+                                                book_view_mode     = EXCLUDED.book_view_mode,
+                                                theme              = EXCLUDED.theme");
+        $stmt->execute([$current_user_id, $new_redirect, $new_author_tab, $new_book_mode, $new_theme]);
         // Shared cache, so the change is visible on every device at its next request.
         user_prefs_invalidate((int)$current_user_id);
         $login_redirect     = $new_redirect;
         $author_default_tab = $new_author_tab;
         $book_view_mode     = $new_book_mode;
+        $theme              = $new_theme;
         $settings_success   = 'Настройки сохранены.';
+        // The page head (with the old theme) was sent before this save ran.
+        echo "<script>flibustaSetTheme('$theme');</script>";
     } elseif (isset($_POST['save_excluded_genres'])) {
         // Own submit name on purpose: the genre list is a separate form with its own
         // button next to the checkboxes, and its own transaction below. The preference
@@ -149,6 +158,11 @@ $tab_checked = [
 $bvm_checked = [
     'withannotation' => $book_view_mode === 'withannotation' ? 'checked' : '',
     'contentonly'    => $book_view_mode === 'contentonly'    ? 'checked' : '',
+];
+$theme_checked = [
+    'auto'  => $theme === 'auto'  ? 'checked' : '',
+    'light' => $theme === 'light' ? 'checked' : '',
+    'dark'  => $theme === 'dark'  ? 'checked' : '',
 ];
 
 // Genre dictionary for the hidden-genres card, grouped by genremeta.
@@ -245,6 +259,25 @@ while ($g = $xg_rows->fetch()) {
               <input class="form-check-input" type="radio" name="login_redirect" id="redirect_last_book"
                 value="last_book" <?= $checked['last_book'] ?>>
               <label class="form-check-label" for="redirect_last_book">Последняя открытая книга</label>
+            </div>
+          </fieldset>
+
+          <fieldset class="mb-3">
+            <legend class="fs-6 fw-semibold">Тема оформления</legend>
+            <div class="form-check mb-2">
+              <input class="form-check-input" type="radio" name="theme" id="theme_auto"
+                value="auto" <?= $theme_checked['auto'] ?>>
+              <label class="form-check-label" for="theme_auto">Авто (как в системе устройства)</label>
+            </div>
+            <div class="form-check mb-2">
+              <input class="form-check-input" type="radio" name="theme" id="theme_light"
+                value="light" <?= $theme_checked['light'] ?>>
+              <label class="form-check-label" for="theme_light">Светлая</label>
+            </div>
+            <div class="form-check">
+              <input class="form-check-input" type="radio" name="theme" id="theme_dark"
+                value="dark" <?= $theme_checked['dark'] ?>>
+              <label class="form-check-label" for="theme_dark">Тёмная</label>
             </div>
           </fieldset>
 

@@ -194,3 +194,6 @@ CREATE TABLE IF NOT EXISTS public.user_excluded_genres (
     genreid BIGINT NOT NULL,
     PRIMARY KEY (user_id, genreid)
 );
+
+-- Colour theme preference (settings module): auto follows the OS setting.
+ALTER TABLE IF EXISTS public.user_settings ADD COLUMN IF NOT EXISTS theme VARCHAR(5) NOT NULL DEFAULT 'auto';

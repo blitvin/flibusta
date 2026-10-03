@@ -33,6 +33,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<?= theme_head_script(current_theme($dbh)) ?>
 <title>Вход в Библиотеку</title>
 <link href="<?= $webroot ?>/bootstrap/css/bootstrap.min.css" rel="stylesheet">
 <script src="<?= $webroot ?>/bootstrap/js/bootstrap.bundle.min.js"></script>

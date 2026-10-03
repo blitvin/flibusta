@@ -1,8 +1,8 @@
 <style>
 .c {
-	background: #eee;
+	background: var(--fl-muted-bg);
 	border-radius: 50%;
-	border-color: #eee;
+	border-color: var(--fl-muted-bg);
 }
 </style>
 
@@ -36,7 +36,7 @@ if (isset($_SESSION['authors_letter'])) {
 	$letter = $get . '%';
 }
 
-echo "<ul class='pagination'>";
+echo "<ul class='pagination flex-wrap'>";
 	foreach (range(chr(0xC0), chr(0xDF)) as $b) {
 		$l = iconv('CP1251', 'UTF-8', $b);
 		if ($l == mb_strtoupper($get)) {
@@ -47,7 +47,7 @@ echo "<ul class='pagination'>";
 		echo "<li class='page-item $cc'><a class='page-link' href='$webroot/authors/?letter=" . urlencode($l) . "'>$l</a></li>";
 	}
 echo "</ul>";
-echo "<ul class='pagination'>";
+echo "<ul class='pagination flex-wrap'>";
 	foreach (range('A', 'Z') as $b) {
 		$l = iconv('CP1251', 'UTF-8', $b);
 		if ($l == mb_strtoupper($get)) {

@@ -1517,7 +1517,8 @@ CREATE TABLE public.user_settings (
     user_id INT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
     login_redirect VARCHAR(20) NOT NULL DEFAULT 'default',
     author_default_tab VARCHAR(10) NOT NULL DEFAULT 'alpha',
-    book_view_mode VARCHAR(15) NOT NULL DEFAULT 'contentonly'
+    book_view_mode VARCHAR(15) NOT NULL DEFAULT 'contentonly',
+    theme VARCHAR(5) NOT NULL DEFAULT 'auto'
 );
 
 ALTER TABLE public.user_settings OWNER TO :FLIBUSTA_DBUSER;

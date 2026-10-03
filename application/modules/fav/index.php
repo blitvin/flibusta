@@ -97,7 +97,7 @@ if ($current_user_id > 0) {
 		echo "<div class='card mb-3'><div class='card-body'>";
 		foreach ($user_series as $series) {
 			echo "<div class='d-flex align-items-center justify-content-between mb-2'>";
-			echo "<a class='mw-100 text-dark' href='$webroot/?sid=" . intval($series->seqid) . "'>" . h($series->seqname) . "</a>";
+			echo "<a class='mw-100 text-body' href='$webroot/?sid=" . intval($series->seqid) . "'>" . h($series->seqname) . "</a>";
 			echo "<form method='POST' action='' class='ms-2'>
 				<input type='hidden' name='action' value='unfav_seq' />
 				<input type='hidden' name='id' value='$series->seqid' />
@@ -200,7 +200,7 @@ while ($list = $lists->fetch()) {
 	if (!empty($legacy_series)) {
 		echo "<h6 class='mb-2 mt-2'>Серии</h6>";
 		foreach ($legacy_series as $series) {
-			echo "<div class='mb-2'><a class='mw-100 text-dark' href='$webroot/?sid=" . intval($series->seqid) . "'>" . h($series->seqname) . "</a></div>";
+			echo "<div class='mb-2'><a class='mw-100 text-body' href='$webroot/?sid=" . intval($series->seqid) . "'>" . h($series->seqname) . "</a></div>";
 		}
 	}
 	echo "</div>";

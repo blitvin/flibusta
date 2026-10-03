@@ -16,7 +16,7 @@ if ($current_user_id > 0) {
 }
 echo "<script src='$webroot/js/pdf.js'></script>\n"; ?>
 
-<div id="pdf-toolbar" style="position:sticky;top:0;z-index:10;background:#fff;padding:6px 0;text-align:center;border-bottom:1px solid #ccc;">
+<div id="pdf-toolbar" style="position:sticky;top:0;z-index:10;background:var(--bs-body-bg);padding:6px 0;text-align:center;border-bottom:1px solid var(--bs-border-color);">
     <button id="prev" onclick="changePage(-1)">&#8249; Назад</button>
     &nbsp;
     <span>Страница <span id="pageNum">—</span> из <span id="pageCount">—</span></span>

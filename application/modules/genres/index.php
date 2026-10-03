@@ -1,8 +1,8 @@
 <style>
 .c {
-	background: #eee;
+	background: var(--fl-muted-bg);
 	border-radius: 50%;
-	border-color: #eee;
+	border-color: var(--fl-muted-bg);
 }
 </style>
 

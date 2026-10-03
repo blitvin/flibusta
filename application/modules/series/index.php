@@ -1,8 +1,8 @@
 <style>
 .c {
-	background: #eee;
+	background: var(--fl-muted-bg);
 	border-radius: 50%;
-	border-color: #eee;
+	border-color: var(--fl-muted-bg);
 }
 </style>
 
@@ -35,7 +35,7 @@ if (isset($_SESSION['series_letter'])) {
 	$letter = $get . '%';
 }
 
-echo "<ul class='pagination'>";
+echo "<ul class='pagination flex-wrap'>";
 	foreach (range(chr(0xC0), chr(0xDF)) as $b) {
 		$l = iconv('CP1251', 'UTF-8', $b);
 		if ($l == mb_strtoupper($get)) {
@@ -46,7 +46,7 @@ echo "<ul class='pagination'>";
 		echo "<li class='page-item $cc'><a class='page-link' href='$webroot/series/?letter=" . urlencode($l) . "'>$l</a></li>";
 	}
 echo "</ul>";
-echo "<ul class='pagination'>";
+echo "<ul class='pagination flex-wrap'>";
 	foreach (range('A', 'Z') as $b) {
 		$l = iconv('CP1251', 'UTF-8', $b);
 		if ($l == mb_strtoupper($get)) {
@@ -117,7 +117,7 @@ echo '<div class="row">';
 show_gpager(ceil($cnt / SERIES_PAGE), 5);
 while ($bs = $stmt->fetch()) {
 	if ($bs->cnt > 0) {
-		echo "<div class='col col-sm-6 mb-3 d-flex justify-content-between'><a class='mw-100 text-dark' href='$webroot/?sid=" . intval($bs->seqid) . "'>" . h($bs->seqname) . "</a><span class='badge bg-secondary'>" . intval($bs->cnt) . "</span></div>";
+		echo "<div class='col col-sm-6 mb-3 d-flex justify-content-between'><a class='mw-100 text-body' href='$webroot/?sid=" . intval($bs->seqid) . "'>" . h($bs->seqname) . "</a><span class='badge bg-secondary'>" . intval($bs->cnt) . "</span></div>";
 	}
 }
 echo "</div>";
