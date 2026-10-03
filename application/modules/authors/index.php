@@ -61,18 +61,16 @@ echo "<ul class='pagination'>";
 echo "</ul>";
 
 
-echo "<form action='$webroot/authors/'>\n";
-?>
+$search_value = isset($_SESSION['authors_q']) ? h($_SESSION['authors_q']) : '';
+echo <<< __HTML
+<form action='$webroot/authors/' role='search'>
 <div class="input-group mb-3">
-  <input name="q" type="text" class="form-control" placeholder="Поиск автора" aria-label="Поиск серии" aria-describedby="basic-addon2">
-  <div class="input-group-append">
-
-    <input type='submit' class="btn btn-outline-secondary" value='Поиск' type="button">
-  </div>
+  <input name="q" type="search" class="form-control" value="$search_value" placeholder="Поиск автора" aria-label="Поиск автора по имени">
+  <button type="submit" class="btn btn-outline-secondary">Поиск</button>
 </div>
 </form>
+__HTML;
 
-<?php
 $start = AUTHORS_PAGE * $page;
 
 if (isset($_SESSION['authors_q'])) {

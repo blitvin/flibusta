@@ -218,18 +218,16 @@ if (isset($_SESSION['filter_series']) && isset($_SESSION['user_id'])) {
 }
 
 echo "<div class='block rounded' style='margin-bottom:8px;'>";
-echo "<form action='$webroot/'>";
-?>
-
+// The box shows the active query, so it can be refined instead of retyped.
+$search_value = isset($_SESSION['search']) ? h($_SESSION['search']) : '';
+echo <<< __HTML
+<form action='$webroot/' role='search'>
 <div class="input-group mb-3">
-   <input name="q" type="text" class="form-control" placeholder="Поиск по названию" aria-label="Поиск серии" aria-describedby="basic-addon2">
-   <div class="input-group-append">
-   <input type='submit' class="btn btn-outline-secondary" value='Поиск' type="button">
-
- </div>
+   <input name="q" type="search" class="form-control" value="$search_value" placeholder="Название или автор" aria-label="Поиск книг по названию или автору">
+   <button type="submit" class="btn btn-outline-secondary">Поиск</button>
 </div>
 </form>
-<?php
+__HTML;
 echo $fcontent;
 
 echo "</div>";
@@ -266,9 +264,11 @@ if (isset($_SESSION['search'])) {
 }
 
 
+$query_failed = false;
 try {
 	$stmt->execute();
 } catch (Exception $e) {
+	$query_failed = true;
 	$protocol = (isset($_SERVER['SERVER_PROTOCOL']) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0');
         header($protocol . ' 504 Gateway Time-out');
 
@@ -276,7 +276,7 @@ try {
 	error_log('primary: book list query failed: ' . $e->getMessage());
 	echo "<div class='card m-3 border-danger'><div class='card-header bg-danger'>База данных</div><div class='card-body'>";
 	echo "<h3>Не удалось выполнить запрос</h3>";
-	echo "<p>Попробуйте упростить параметры поиска, убрать часть тэгов, направленность. Сервер маленький ^^.</p>";
+	echo "<p>Попробуйте упростить поисковый запрос или убрать часть фильтров.</p>";
 	echo "</div></div>";
 }
 
@@ -326,6 +326,18 @@ while ($book = $stmt->fetch()) {
 		break;
 	}
 	book_info_pg($book, $webroot);
+}
+
+if ($c === 0 && !$query_failed) {
+	$has_filters = isset($_SESSION['search']) || isset($_SESSION['filter_author'])
+		|| isset($_SESSION['filter_genre']) || isset($_SESSION['filter_xgenre'])
+		|| isset($_SESSION['filter_series']) || isset($_SESSION['fb2'])
+		|| isset($_SESSION['ru']) || $xgenres_active;
+	echo "<div class='alert alert-secondary mt-2'><b>Ничего не найдено.</b>";
+	if ($has_filters) {
+		echo " Попробуйте изменить запрос или снять часть фильтров (нажмите на фильтр, чтобы убрать его).";
+	}
+	echo "</div>";
 }
 
 show_gpager(ceil($cnt / RECORDS_PAGE), 5);
