@@ -40,6 +40,86 @@ function get_ds($path){
 	return round($size / 1024, 1);
 }
 
+function fmt_bytes($bytes) {
+	$bytes = (float)$bytes;
+	$units = ['B', 'KB', 'MB', 'GB', 'TB'];
+	$i = 0;
+	while ($bytes >= 1024 && $i < count($units) - 1) {
+		$bytes /= 1024;
+		$i++;
+	}
+	return round($bytes, 1) . ' ' . $units[$i];
+}
+
+function redisStatusCard() {
+	$st = redis_status();
+	if ($st === null) {
+		return;
+	}
+	echo "<div class='row'><div class='col-sm-12 mt-3'><div class='card'>";
+	echo "<h4 class='rounded-top p-1' style='background: #d0d0d0;'>Redis</h4><div class='card-body'>";
+	if (!$st['ok']) {
+		echo "<div class='alert alert-danger mb-0'>Redis недоступен: " . h($st['error']) . "</div>";
+		echo "</div></div></div></div>";
+		return;
+	}
+
+	$used = (int)$st['used_memory'];
+	$max = (int)$st['maxmemory'];
+	$policy = (string)$st['maxmemory_policy'];
+	$evicted = (int)$st['evicted_keys'];
+	$hits = (int)$st['keyspace_hits'];
+	$misses = (int)$st['keyspace_misses'];
+
+	$warnings = [];
+	if ($max === 0) {
+		$warnings[] = 'Не задан maxmemory: Redis может занять всю память. Запускайте с <code>--maxmemory &lt;n&gt;</code>.';
+	}
+	if ($policy !== 'volatile-lru') {
+		$warnings[] = 'Политика вытеснения <code>' . h($policy) . '</code> вместо <code>volatile-lru</code>: служебные ключи (lib:gen, cache:secret) могут быть вытеснены, или запись будет отклоняться при нехватке памяти.';
+	}
+	if ($evicted > 0) {
+		$warnings[] = 'Redis вытеснял ключи из-за нехватки памяти (' . $evicted . '). Возможно, стоит увеличить maxmemory.';
+	}
+	foreach ($warnings as $w) {
+		echo "<div class='alert alert-warning py-2'>$w</div>";
+	}
+
+	$memory = h(fmt_bytes($used)) . ($max > 0 ? ' из ' . h(fmt_bytes($max)) : ' (без ограничения)');
+	if ($max > 0) {
+		$pct = min(100, round($used * 100 / $max, 1));
+		$bar = $pct < 75 ? 'bg-success' : ($pct < 90 ? 'bg-warning' : 'bg-danger');
+		$memory .= " ($pct%)<div class='progress mt-1' style='height: .6rem;'>"
+			. "<div class='progress-bar $bar' role='progressbar' style='width: $pct%;' aria-valuenow='$pct' aria-valuemin='0' aria-valuemax='100'></div></div>";
+	}
+
+	$up = (int)$st['uptime_in_seconds'];
+	$uptime = intdiv($up, 86400) . ' дн. ' . intdiv($up % 86400, 3600) . ' ч.';
+	$hitRate = ($hits + $misses) > 0 ? round($hits * 100 / ($hits + $misses), 1) . '%' : 'нет данных';
+
+	$rows = [
+		['Версия', h($st['redis_version'])],
+		['Аптайм', h($uptime)],
+		['Память', $memory],
+		['Пик памяти', h(fmt_bytes($st['used_memory_peak']))],
+		['Фрагментация', h($st['mem_fragmentation_ratio'])],
+		['Политика вытеснения', h($policy)],
+		['Ключей (с TTL)', h($st['keys']) . ' (' . h($st['expires']) . ')'],
+		['Активных сессий', h($st['sessions'])],
+		['Поколение библиотеки', h($st['lib_gen'] ?? 'нет')],
+		['Клиентов', h($st['connected_clients'])],
+		['Попадания в кэш', h($hitRate) . ' <small class="text-muted">(' . $hits . ' / ' . ($hits + $misses) . ' с момента запуска Redis)</small>'],
+		['Вытеснено ключей', h($evicted)],
+		['Истекло ключей', h($st['expired_keys'])],
+	];
+	echo "<table class='table'><tbody>";
+	foreach ($rows as [$label, $value]) {
+		echo "<tr><td>$label:</td><td>$value</td></tr>";
+	}
+	echo "</tbody></table>";
+	echo "</div></div></div></div>";
+}
+
 function serviceActionButton($action, $label, $class, $token) {
 	$safeAction = htmlspecialchars($action, ENT_QUOTES, 'UTF-8');
 	$safeLabel = htmlspecialchars($label, ENT_QUOTES, 'UTF-8');
@@ -129,6 +209,9 @@ echo <<< __HTML
 </div>
 </div>
 </div>
+__HTML;
+redisStatusCard();
+echo <<< __HTML
 
 <div class='row'>
 <div class="col-sm-12 mt-3">

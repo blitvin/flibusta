@@ -317,3 +317,51 @@ function book_cache_key(string $suffix): string
 {
 	return 'book:' . lib_generation() . ':' . $suffix;
 }
+
+/**
+ * Health figures for the admin service page, or null when Redis is not enabled.
+ * ['ok' => false, 'error' => ...] when it is enabled but cannot be queried -
+ * INFO may also be renamed away on a hardened instance. Counters such as hits
+ * and evictions are instance-wide and run from the last Redis restart.
+ */
+function redis_status(): ?array
+{
+	if (!flibusta_redis_enabled()) {
+		return null;
+	}
+	$r = cache_handle();
+	if ($r === null) {
+		return ['ok' => false, 'error' => 'нет соединения'];
+	}
+	try {
+		$info = $r->info();
+		if (!is_array($info)) {
+			return ['ok' => false, 'error' => 'команда INFO недоступна'];
+		}
+		$fields = ['redis_version', 'uptime_in_seconds', 'used_memory', 'used_memory_peak',
+			'maxmemory', 'maxmemory_policy', 'mem_fragmentation_ratio', 'connected_clients',
+			'keyspace_hits', 'keyspace_misses', 'evicted_keys', 'expired_keys'];
+		$status = ['ok' => true];
+		foreach ($fields as $f) {
+			$status[$f] = $info[$f] ?? null;
+		}
+		// Keyspace line for our database: "keys=12,expires=10,avg_ttl=..."
+		$status['keys'] = 0;
+		$status['expires'] = 0;
+		$db = 'db' . (int)(getenv('FLIBUSTA_REDIS_DB') ?: 0);
+		if (isset($info[$db])) {
+			$line = $info[$db];
+			if (is_string($line)) {
+				parse_str(str_replace(',', '&', $line), $line);
+			}
+			$status['keys'] = (int)($line['keys'] ?? 0);
+			$status['expires'] = (int)($line['expires'] ?? 0);
+		}
+		$status['sessions'] = (int)$r->zCard('sess:all');
+		$gen = $r->get('lib:gen');
+		$status['lib_gen'] = ($gen === false || $gen === null) ? null : (int)$gen;
+		return $status;
+	} catch (Throwable $e) {
+		return ['ok' => false, 'error' => $e->getMessage()];
+	}
+}
