@@ -75,53 +75,20 @@ __HTML
 
 </head>
 <?php
-$c1 = '';
-$c2 = '';
-$c3 = '';
-$c4 = '';
-$c5 = '';
-$c6 = '';
-$c7 = '';
-$c8 = '';
-$s8 = '';
-$s9 = '';
-
-switch ($url->mod) {
-	case '':
-		$c1 = 'active';
-		break;
-	case 'genres':
-		$c2 = 'active';
-		break;
-	case 'genres':
-		$c3 = 'active';
-		break;
-	case 'authors':
-		$c4 = 'active';
-		break;
-	case 'fav':
-		$c5 = 'active';
-		break;
-	case 'service':
-		$c6 = 'active';
-		break;
-	case 'users':
-		$c7 = 'active';
-		break;
-	case 'addbook':
-		$c8 = 'active';
-		break;
-	case 'help':
-		$s8 = 'active';
-		break;
-	case 'settings':
-		$s9 = 'active';
-		break;
-	default:
-		$c1 = 'active';
+// Active menu entry, keyed by menu item. Bootstrap 5 highlights
+// .nav-link/.dropdown-item.active, so each $a[...] is spliced into the link's
+// single-quoted class attribute and also closes it with aria-current.
+$navItems = ['books' => ['primary', 'book'], 'authors' => ['authors', 'author'],
+	'series' => ['series'], 'genres' => ['genres'], 'fav' => ['fav', 'favlist'],
+	'help' => ['help'], 'service' => ['service'], 'users' => ['users'],
+	'addbook' => ['addbook'], 'settings' => ['settings']];
+$a = [];
+foreach ($navItems as $key => $mods) {
+	$a[$key] = in_array($url->mod, $mods, true) ? "active' aria-current='page" : '';
 }
+$adminActive = in_array($url->mod, ['service', 'users', 'addbook'], true) ? 'active' : '';
 
-
+$is_admin = !empty($_SESSION['is_admin']);
 
 echo <<< __HTML
 
@@ -133,43 +100,55 @@ echo <<< __HTML
   <a class="navbar-brand" href="$webroot/" title="Библиотека">
    &nbsp;Библиотека
   </a>
-		<ul class="navbar-nav mr-auto">
-			<li class="nav-item $c1"><a title="" class="nav-link" href="$webroot/">Книги</a></li>
-			<li class="nav-item $c2"><a title="" class="nav-link" href="$webroot/genres/">Жанры</a></li>
-			<li class="nav-item $c4"><a title="" class="nav-link" href="$webroot/authors/">Авторы</a></li>
-			<li class="nav-item $c3"><a title="" class="nav-link" href="$webroot/series/">Серии</a></li>
-			<li class="nav-item $c5"><a title="" class="nav-link" href="$webroot/fav/">Полка</a></li>
-			<li class="nav-item $s8"><a title="" class="nav-link" href="$webroot/help/">Справка</a></li>
-			
+  <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav" aria-controls="mainNav" aria-expanded="false" aria-label="Меню">
+    <span class="navbar-toggler-icon"></span>
+  </button>
+  <div class="collapse navbar-collapse" id="mainNav">
+		<ul class="navbar-nav me-auto">
+			<li class="nav-item"><a class='nav-link {$a['books']}' href="$webroot/">Книги</a></li>
+			<li class="nav-item"><a class='nav-link {$a['authors']}' href="$webroot/authors/">Авторы</a></li>
+			<li class="nav-item"><a class='nav-link {$a['series']}' href="$webroot/series/">Серии</a></li>
+			<li class="nav-item"><a class='nav-link {$a['genres']}' href="$webroot/genres/">Жанры</a></li>
+			<li class="nav-item"><a class='nav-link {$a['fav']}' href="$webroot/fav/">Полка</a></li>
+			<li class="nav-item"><a class='nav-link {$a['help']}' href="$webroot/help/">Справка</a></li>
+
 __HTML;
 
-if (isset($_SESSION['is_admin']) && $_SESSION['is_admin']) {
+if ($is_admin) {
 echo  <<< __HTML
-			<li class="nav-item $c6"><a title="" class="nav-link" href="$webroot/service/">Сервис</a></li>
-			<li class="nav-item $c7"><a title="" class="nav-link" href="$webroot/users/">Пользователи</a></li>
-			<li class="nav-item $c8"><a title="" class="nav-link" href="$webroot/addbook/">Добавить</a></li>
+			<li class="nav-item dropdown">
+				<a class="nav-link dropdown-toggle $adminActive" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">Администрирование</a>
+				<ul class="dropdown-menu">
+					<li><a class='dropdown-item {$a['service']}' href="$webroot/service/">Сервис</a></li>
+					<li><a class='dropdown-item {$a['users']}' href="$webroot/users/">Пользователи</a></li>
+					<li><a class='dropdown-item {$a['addbook']}' href="$webroot/addbook/">Добавить книги</a></li>
+				</ul>
+			</li>
 __HTML;
 }
-if (isset($_SESSION['user_id']) && $_SESSION['user_id']) {
-echo <<< __HTML
-			<li class="nav-item $s9"><a title="" class="nav-link" href="$webroot/settings/">Настройки</a></li>
-__HTML;
-}
-$user_name_html = '';
+
+echo "\t\t</ul>\n<div class='d-flex align-items-center'>\n";
 if (! empty($_SESSION['username'])) {
-    $user_name = htmlspecialchars($_SESSION['username'], ENT_QUOTES, 'UTF-8');
-    if (isset($_SESSION['is_admin']) && $_SESSION['is_admin']) {
-        $user_name_html = "<span class='btn btn-warning btn-sm me-2'>$user_name</span>";
-    } else {
-        $user_name_html = "<span class='btn btn-outline-info btn-sm me-2'>$user_name</span>";
-    }
+	$user_name = htmlspecialchars($_SESSION['username'], ENT_QUOTES, 'UTF-8');
+	$badge = $is_admin ? 'btn-warning' : 'btn-outline-info';
+	$settings_item = (! empty($_SESSION['user_id']))
+		? "<li><a class='dropdown-item {$a['settings']}' href='$webroot/settings/'>Настройки</a></li>"
+		: '';
+	echo <<< __HTML
+<div class="dropdown">
+	<button class="btn $badge btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" data-bs-display="static" aria-expanded="false">$user_name</button>
+	<ul class="dropdown-menu dropdown-menu-lg-end">
+		$settings_item
+		<li><a class="dropdown-item" href="$webroot/login.php">Сменить пользователя</a></li>
+	</ul>
+</div>
+__HTML;
+} else {
+	echo "<a class='btn btn-outline-light btn-sm' href='$webroot/login.php'>Войти</a>\n";
 }
 echo <<< __HTML
-		</ul>
-<div class="d-flex align-items-center">
-$user_name_html
-<a class='btn btn-outline-light btn-sm' href='$webroot/login.php'>Сменить пользователя</a>
 </div>
+  </div>
 </div>
 </nav>
 </div>
