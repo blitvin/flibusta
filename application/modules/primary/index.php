@@ -21,6 +21,16 @@ if (isset($_GET['q'])) {
 	}
 }
 
+// Keyword badge on a book card: substring match on libbook.keywords.
+if (isset($_GET['kw'])) {
+	$kw = mb_substr(trim((string)$_GET['kw']), 0, 100);
+	if ($kw === '') {
+		unset($_SESSION['filter_keyword']);
+	} else {
+		$_SESSION['filter_keyword'] = $kw;
+	}
+}
+
 if (isset($_GET['aid'])) {
 	if ($_GET['aid'] == '') {
 		unset($_SESSION['filter_author']);
@@ -191,6 +201,15 @@ if (isset($_SESSION['filter_series'])) {
 	$seqid = $_SESSION['filter_series'];
 }
 
+if (isset($_SESSION['filter_keyword'])) {
+	// Keywords are not in the FTS vector; a trigram index on libbook.keywords
+	// (postgres_migration.sql) keeps this ILIKE fast for 3+ character words.
+	$filter .= 'AND b.keywords ILIKE :kw ';
+	$kw_pattern = '%' . addcslashes($_SESSION['filter_keyword'], '%_\\') . '%';
+	$fcontent .= "<div class='badge bg-secondary p-1 text-white'>";
+	$fcontent .= "<a class='text-white' href='$webroot/?kw' title='Убрать фильтр по ключевому слову'>" . h($_SESSION['filter_keyword']) . " <i class='fas fa-times-circle'></i></a></div> ";
+}
+
 if (isset($_SESSION['search'])) {
 	$join .= 'LEFT JOIN libbook_ts bt ON bt.bookid = b.bookid ';
 	$filter .= "AND (bt.vector @@ websearch_to_tsquery('russian', :search)
@@ -257,6 +276,9 @@ if (isset($_SESSION['filter_xgenre'])) {
 if (isset($_SESSION['filter_series'])) {
 	$stmt->bindParam(":sid", $_SESSION['filter_series']);
 }
+if (isset($_SESSION['filter_keyword'])) {
+	$stmt->bindParam(":kw", $kw_pattern);
+}
 if (isset($_SESSION['search'])) {
 	$stmt->bindParam(":search",  $_SESSION['search']);
 	$stmt->bindParam(":search2", $_SESSION['search']);
@@ -300,6 +322,9 @@ if (COUNT_BOOKS) {
 	if (isset($_SESSION['filter_series'])) {
 		$stt->bindParam(":sid", $_SESSION['filter_series']);
 	}
+	if (isset($_SESSION['filter_keyword'])) {
+		$stt->bindParam(":kw", $kw_pattern);
+	}
 	if (isset($_SESSION['search'])) {
 		$stt->bindParam(":search",  $_SESSION['search']);
 		$stt->bindParam(":search2", $_SESSION['search']);
@@ -331,7 +356,8 @@ while ($book = $stmt->fetch()) {
 if ($c === 0 && !$query_failed) {
 	$has_filters = isset($_SESSION['search']) || isset($_SESSION['filter_author'])
 		|| isset($_SESSION['filter_genre']) || isset($_SESSION['filter_xgenre'])
-		|| isset($_SESSION['filter_series']) || isset($_SESSION['fb2'])
+		|| isset($_SESSION['filter_series']) || isset($_SESSION['filter_keyword'])
+		|| isset($_SESSION['fb2'])
 		|| isset($_SESSION['ru']) || $xgenres_active;
 	echo "<div class='alert alert-secondary mt-2'><b>Ничего не найдено.</b>";
 	if ($has_filters) {

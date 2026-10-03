@@ -1624,3 +1624,7 @@ CREATE INDEX idx_libavtorname_trgm ON public.libavtorname
 
 CREATE INDEX idx_libbook_title_trgm ON public.libbook
     USING gin (title gin_trgm_ops);
+
+-- Keyword filter on the book list (book card keyword badges, ?kw=): ILIKE '%word%'.
+CREATE INDEX idx_libbook_keywords_trgm ON public.libbook
+    USING gin (keywords gin_trgm_ops);

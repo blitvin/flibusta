@@ -175,6 +175,11 @@ CREATE INDEX IF NOT EXISTS idx_libavtorname_trgm ON public.libavtorname
 CREATE INDEX IF NOT EXISTS idx_libbook_title_trgm ON public.libbook
     USING gin (title gin_trgm_ops);
 
+-- Keyword filter on the book list (book card keyword badges, ?kw=) does
+-- ILIKE '%word%' on libbook.keywords. Kept across imports like the above.
+CREATE INDEX IF NOT EXISTS idx_libbook_keywords_trgm ON public.libbook
+    USING gin (keywords gin_trgm_ops);
+
 -- ============================================================================
 -- Migration: per-user hidden genres (settings module -> "Скрытые жанры")
 -- Books in these genres are filtered out of the main book list.

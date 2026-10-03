@@ -293,7 +293,9 @@ function book_small_pg($book, $webroot='',$full = false) {
 
 	// Row 1: year + download (split dropdown for fb2, plain button for others)
 	echo "<div class='btn-group w-100 mt-auto' role='group'>";
-	echo "<button type='button' class='btn btn-outline-secondary btn-sm'$year_title>$year</button>";
+	// A label, not a control: keeps the button look inside the group, but
+	// .book-year (style.css) drops the hover effect; the tooltip still works.
+	echo "<span class='btn btn-outline-secondary btn-sm book-year'$year_title>$year</span>";
 	if (trim($book->filetype) === 'fb2') {
 		echo "<a href='$fhref' class='btn btn-outline-success btn-sm'>fb2</a>";
 		echo "<div class='btn-group btn-group-sm' role='group'>";
@@ -382,7 +384,7 @@ function book_info_pg($book, $webroot = '', $full = false) {
 
 	// Row 1: year + download (split dropdown for fb2, plain button for others)
 	echo "<div class='btn-group w-100 mt-1' role='group'>";
-	echo "<button type='button' class='btn btn-outline-secondary btn-sm'$year_title>$year</button>";
+	echo "<span class='btn btn-outline-secondary btn-sm book-year'$year_title>$year</span>";
 	if (trim($book->filetype) === 'fb2') {
 		$bid = intval($book->bookid);
 		echo "<a href='$fhref' class='btn btn-outline-success btn-sm'>fb2</a>";
@@ -458,7 +460,11 @@ function book_info_pg($book, $webroot = '', $full = false) {
 	if ($book->keywords != '') {
 		$kw = explode(",", $book->keywords);
 		foreach ($kw as $k) {
-			echo "<a class='badge bg-secondary p-1 text-white' href='#'>" . h($k) . "</a> ";
+			$k = trim($k);
+			if ($k === '') {
+				continue;
+			}
+			echo "<a class='badge bg-secondary p-1 text-white' href='$webroot/?kw=" . urlencode($k) . "' title='Книги с ключевым словом'>" . h($k) . "</a> ";
 		}
 	}
 	echo "</div>";

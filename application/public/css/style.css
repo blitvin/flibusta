@@ -115,6 +115,15 @@ h4 {
 	}
 }
 
+/* Year label in the card's button group: looks like its neighbours, but is
+   not clickable, so it must not react to hover. */
+.book-year,
+.book-year:hover {
+	cursor: default;
+	background-color: transparent;
+	color: var(--bs-secondary);
+}
+
 /* Grid tile from book_small_pg(). Not .cover: that max-height is for an image,
    and on the tile it let a two-line title push the buttons out of the box. */
 .book-tile {
