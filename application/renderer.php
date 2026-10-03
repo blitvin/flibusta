@@ -6,8 +6,30 @@ if ($url->mod !== 'service') {
 		header('Refresh: 30');
 		header('Content-Type: text/html; charset=utf-8');
 		http_response_code(503);
-		echo '<H1>В данный момент библиотека проходит техническое обслуживание и поэтому недоступна</H1> Пожалуйста подождите.';
-		echo 'Эта страница будет автоматически перезагружаться пока техобслуживание не закончмтся. После этого автоматически загрузится страница, которую Вы запросили.';
+		include_once(ROOT_PATH . 'webroot.php');
+		echo <<< __HTML
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Техобслуживание — Библиотека</title>
+<link href="$webroot/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body style="background-color: #343a40;">
+<div class="container py-5">
+<div class="card mx-auto shadow" style="max-width: 36rem;">
+<div class="card-body text-center p-4">
+<div class="spinner-border text-secondary mb-3" role="status" aria-hidden="true"></div>
+<h1 class="h4">Идёт техническое обслуживание</h1>
+<p class="mb-1">Библиотека обновляет базу данных и временно недоступна.</p>
+<p class="text-muted mb-0">Страница обновляется сама каждые 30 секунд и откроется, как только обслуживание закончится.</p>
+</div>
+</div>
+</div>
+</body>
+</html>
+__HTML;
 		die();
 	}
 }
@@ -18,7 +40,6 @@ if ($url->mod !== 'service') {
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-<meta name='wmail-verification' content='7404cc552213a233445be2fe20acca8c' />
 
 <?php
 	if ($url->description != '') {
@@ -177,12 +198,11 @@ finally {
 
 
 
-<div class="container whb rounded-bottom mb-3">
-	<nav class="navbar navbar-expand-lg rounded-top shadow navbar-dark bg-dark" style="background-color: #768fa8;">
-		<ul class="navbar-nav mr-auto">
-		</ul>
-	</nav>
-</div>
+<footer class="container whb rounded-bottom mb-3 py-2 text-center small site-footer">
+	<a href="<?= $webroot ?>/help/">Справка</a>
+	<span class="mx-2" aria-hidden="true">·</span>
+	<a href="<?= $webroot ?>/help/#opds" title="Как подключить библиотеку в приложении-читалке">OPDS для читалок</a>
+</footer>
 
 
 

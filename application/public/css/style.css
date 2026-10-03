@@ -97,6 +97,23 @@ h4 {
 	object-fit: contain;
 }
 
+/* One-line footer under the page content. */
+.site-footer {
+	border-top: 1px solid #dee2e6;
+}
+.site-footer a {
+	color: #6c757d;
+	text-decoration: none;
+}
+.site-footer a:hover {
+	text-decoration: underline;
+}
+
+/* Grey title strip on top of cards (book cards, service, users, addbook). */
+.card-title-bar {
+	background: #d0d0d0;
+}
+
 /* Book card from book_info_pg(). */
 .book-card-grid {
 	display: grid;

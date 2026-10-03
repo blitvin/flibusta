@@ -23,7 +23,7 @@ function users_render_tabs(string $active): void {
     ];
 
     echo "<div class='row'><div class='col-sm-12'><div class='card'>";
-    echo "<h4 class='rounded-top p-1' style='background: #d0d0d0;'>Управление пользователями</h4>";
+    echo "<h4 class='rounded-top p-1 card-title-bar'>Управление пользователями</h4>";
     echo "<div class='card-body'>";
 
     foreach ($tabs as $key => $title) {

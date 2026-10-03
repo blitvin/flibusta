@@ -82,7 +82,7 @@ echo "<p>Если ответа там не нашлось — вопросы и 
 	. "<a href='https://github.com/blitvin/flibusta/issues' target='_blank' rel='noopener noreferrer'>issues на GitHub</a>.</p>";
 echo "<hr style='width:50%; margin:auto;'/><br><br><br>";
 
-echo "<h5>OPDS</h5>";
+echo "<h5 id='opds'>OPDS</h5>";
 echo "<p>OPDS (Open Publication Distribution System) — это стандартный каталогный протокол для электронных ридеров.
  Он позволяет подключаться к библиотеке как к каталогу, просматривать книги и загружать их из мобильного приложения.</p>";
 

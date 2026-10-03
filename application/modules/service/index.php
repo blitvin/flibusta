@@ -57,7 +57,7 @@ function redisStatusCard() {
 		return;
 	}
 	echo "<div class='row'><div class='col-sm-12 mt-3'><div class='card'>";
-	echo "<h4 class='rounded-top p-1' style='background: #d0d0d0;'>Redis</h4><div class='card-body'>";
+	echo "<h4 class='rounded-top p-1 card-title-bar'>Redis</h4><div class='card-body'>";
 	if (!$st['ok']) {
 		echo "<div class='alert alert-danger mb-0'>Redis недоступен: " . h($st['error']) . "</div>";
 		echo "</div></div></div></div>";
@@ -132,12 +132,12 @@ function serviceActionButton($action, $label, $class, $token) {
 
 if ($service_name !== false) { 
 	// обработка нажатия на кнопку команды
-	echo "<h4 class='rounded-top p-1' style='background: #d0d0d0;'>Команда ".serviceName2Label($service_name)." начинает выполнение</h4>";
+	echo "<h4 class='rounded-top p-1 card-title-bar'>Команда ".serviceName2Label($service_name)." начинает выполнение</h4>";
 	echo "<p>Через секунду страница начнет показ выполнения команды или, если команда быстро выполнится, вернется к дэшборду";
 }
 elseif ($command_running) {
 	// частичный output выполнения
-	echo "<h4 class='rounded-top p-1' style='background: #d0d0d0;'>Выполнение команды &quot;".get2serviceName()."&quot;</h4>";
+	echo "<h4 class='rounded-top p-1 card-title-bar'>Выполнение команды &quot;".get2serviceName()."&quot;</h4>";
 	$op = file_get_contents(ADMINOPSTATUSFILE);
 	echo "<div class='d-flex align-items-center m-3'>";
 	echo nl2br(htmlspecialchars($op, ENT_QUOTES, 'UTF-8'));
@@ -148,7 +148,7 @@ elseif ($command_running) {
 <div class='row'>
 <div class="col-sm-6">
 <div class='card'>
-<h4 class="rounded-top p-1" style="background: #d0d0d0;">Статистика</h4>
+<h4 class="rounded-top p-1 card-title-bar">Статистика</h4>
 <div class='card-body'>
 __HTML;
 	$cache_size = get_ds(CACHE_PATH."covers") + get_ds(CACHE_PATH."authors");
@@ -182,7 +182,7 @@ __HTML;
 
 <div class="col-sm-6">
 <div class='card'>
-<h4 class="rounded-top p-1" style="background: #d0d0d0;">Операции</h4>
+<h4 class="rounded-top p-1 card-title-bar">Операции</h4>
 <div class='card-body'>
 <table class='table'><tbody>
 
@@ -216,7 +216,7 @@ echo <<< __HTML
 <div class='row'>
 <div class="col-sm-12 mt-3">
 <div class='card'>
-<h4 class="rounded-top p-1" style="background: #d0d0d0;">Добавить книги из торрента</h4>
+<h4 class="rounded-top p-1 card-title-bar">Добавить книги из торрента</h4>
 <div class='card-body'>
 <form method='POST' class='mb-3'>
 <input type='hidden' name='csrf_token' value='$safeToken'>

@@ -4,7 +4,7 @@ global $url;
 global $webroot;
 global $addbook_errors, $addbook_dup_titles;
 
-echo "<h4 class='rounded-top p-1' style='background: #d0d0d0;'>Добавить книгу в библиотеку</h4>";
+echo "<h4 class='rounded-top p-1 card-title-bar'>Добавить книгу в библиотеку</h4>";
 
 // success banner after redirect
 if (isset($_GET['added']) && ctype_digit($_GET['added'])) {

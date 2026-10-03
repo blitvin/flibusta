@@ -279,6 +279,8 @@ function book_small_pg($book, $webroot='',$full = false) {
 			$fav_action = 'unfav_book';
 		}
 	}
+	$fav_pressed = ($fav_action === 'unfav_book') ? 'true' : 'false';
+	$fav_label = ($fav_action === 'unfav_book') ? 'Убрать из избранного' : 'В избранное';
 
 	echo "<div class='book-tile-title'>$title</div>";
 	// Coverless tiles show the title on the cover box, so the strip below it
@@ -330,7 +332,7 @@ function book_small_pg($book, $webroot='',$full = false) {
 			<input type='hidden' name='action' value='$fav_action' />
 			<input type='hidden' name='id' value='$fav_id' />
 			<input type='hidden' name='csrf_token' value='" . htmlspecialchars(get_csrf_token()) . "' />
-			<button type='submit' title='В избранное' class='btn $fav btn-sm'><i class='fas fa-heart'></i></button>
+			<button type='submit' title='$fav_label' aria-label='$fav_label' aria-pressed='$fav_pressed' class='btn $fav btn-sm'><i class='fas fa-heart' aria-hidden='true'></i></button>
 		</form>";
 	}
 	echo "</div>";
@@ -345,7 +347,7 @@ function book_info_pg($book, $webroot = '', $full = false) {
 	$current_user_id = isset($_SESSION['user_id']) ? intval($_SESSION['user_id']) : 0;
 	echo "<div class='hic card mb-3' itemscope='' itemtype='http://schema.org/Book'>";
 //	echo "<div class='card-header'>";
-	echo "<h4 class='rounded-top' style='background: #d0d0d0;'><a class='book-link' href='$webroot/book/view/" . intval($book->bookid) . "' title='" . h($book->title) . "'><i class='fas'></i> " . h($book->title) . "</a></h4>";
+	echo "<h4 class='rounded-top card-title-bar'><a class='book-link' href='$webroot/book/view/" . intval($book->bookid) . "' title='" . h($book->title) . "'><i class='fas'></i> " . h($book->title) . "</a></h4>";
 //	echo "</div>";
 	echo "<div class='card-body'>";
 	// Grid areas (style.css .book-card-grid): on phones a thumbnail beside the
@@ -381,6 +383,8 @@ function book_info_pg($book, $webroot = '', $full = false) {
 			$fav_action = 'unfav_book';
 		}
 	}
+	$fav_pressed = ($fav_action === 'unfav_book') ? 'true' : 'false';
+	$fav_label = ($fav_action === 'unfav_book') ? 'Убрать из избранного' : 'В избранное';
 
 	// Row 1: year + download (split dropdown for fb2, plain button for others)
 	echo "<div class='btn-group w-100 mt-1' role='group'>";
@@ -419,7 +423,7 @@ function book_info_pg($book, $webroot = '', $full = false) {
 			<input type='hidden' name='action' value='$fav_action' />
 			<input type='hidden' name='id' value='$book->bookid' />
 			<input type='hidden' name='csrf_token' value='" . htmlspecialchars(get_csrf_token()) . "' />
-			<button type='submit' title='В избранное' class='btn $fav btn-sm'><i class='fas fa-heart'></i></button>
+			<button type='submit' title='$fav_label' aria-label='$fav_label' aria-pressed='$fav_pressed' class='btn $fav btn-sm'><i class='fas fa-heart' aria-hidden='true'></i></button>
 		</form>";
 	}
 	echo "</div>";
