@@ -92,6 +92,27 @@ h4 {
 .cover {
 	box-shadow: 0 .125rem .25rem rgba(0,0,0,.9)!important;
 	max-height: 400px;
+	/* w-100 sets the width; letting the height follow keeps the aspect ratio. */
+	height: auto;
+	object-fit: contain;
+}
+
+/* Book card from book_info_pg(). */
+.book-card-grid {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+	grid-template-areas: "cover info" "actions actions";
+	column-gap: 1rem;
+}
+.book-card-cover   { grid-area: cover; }
+.book-card-actions { grid-area: actions; align-self: start; }
+.book-card-info    { grid-area: info; min-width: 0; }
+@media (min-width: 576px) {
+	.book-card-grid {
+		grid-template-columns: minmax(0, 1fr) minmax(0, 5fr);
+		grid-template-areas: "cover info" "actions info";
+		grid-template-rows: auto 1fr;
+	}
 }
 
 /* Grid tile from book_small_pg(). Not .cover: that max-height is for an image,

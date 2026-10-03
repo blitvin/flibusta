@@ -145,31 +145,33 @@ function show_gpager($page_count, $block_size = 100) {
 
 	// First page
 	$dis = ($page == 0) ? ' disabled' : '';
-	echo "<li class='page-item$dis'><a class='page-link' href='?page=0' title='Первая страница'>"
+	echo "<li class='page-item$dis'><a class='page-link' href='?page=0' title='Первая страница' aria-label='Первая страница'>"
 	   . "<i class='fas fa-angle-double-left'></i></a></li>";
 
 	// Previous block
 	if ($b1 > 1) {
 		echo "<li class='page-item'><a class='page-link' href='?page=", $b1 - 2,
-		     "' title='Предыдущие'><i class='fas fa-angle-left'></i></a></li>";
+		     "' title='Предыдущие' aria-label='Предыдущие'><i class='fas fa-angle-left'></i></a></li>";
 	}
 
-	// Numbered pages
+	// Numbered pages. On phones only the current page and its neighbours are
+	// shown; the full block would not fit and .pagination does not wrap.
 	for ($p = $b1; $p <= $b2; $p++) {
 		$active = ($p == $display_page) ? ' active' : '';
-		echo "<li class='page-item$active'><a class='page-link' href='?page=", $p - 1, "'>$p</a></li>";
+		$far = (abs($p - $display_page) > 1) ? ' d-none d-sm-block' : '';
+		echo "<li class='page-item$active$far'><a class='page-link' href='?page=", $p - 1, "'>$p</a></li>";
 	}
 
 	// Next block
 	if ($b2 < $page_count) {
 		echo "<li class='page-item'><a class='page-link' href='?page=$b2'"
-		   . " title='Следующие'><i class='fas fa-angle-right'></i></a></li>";
+		   . " title='Следующие' aria-label='Следующие'><i class='fas fa-angle-right'></i></a></li>";
 	}
 
 	// Last page
 	$dis = ($page == $page_count - 1) ? ' disabled' : '';
 	echo "<li class='page-item$dis'><a class='page-link' href='?page=", $page_count - 1,
-	     "' title='Последняя страница'><i class='fas fa-angle-double-right'></i></a></li>";
+	     "' title='Последняя страница' aria-label='Последняя страница'><i class='fas fa-angle-double-right'></i></a></li>";
 
 	echo "</ul>";
 
@@ -344,9 +346,13 @@ function book_info_pg($book, $webroot = '', $full = false) {
 	echo "<h4 class='rounded-top' style='background: #d0d0d0;'><a class='book-link' href='$webroot/book/view/" . intval($book->bookid) . "' title='" . h($book->title) . "'><i class='fas'></i> " . h($book->title) . "</a></h4>";
 //	echo "</div>";
 	echo "<div class='card-body'>";
-	echo "<div class='row'>";
-	echo "<div class='col-sm-2'>";
-	echo "<img class='w-100 card-image rounded cover' src='$webroot/extract_cover.php?sid=$book->bookid' />";
+	// Grid areas (style.css .book-card-grid): on phones a thumbnail beside the
+	// text with the buttons full-width below both; from sm up the buttons sit
+	// under the cover as before.
+	echo "<div class='book-card-grid'>";
+	echo "<div class='book-card-cover'>";
+	echo "<img class='w-100 card-image rounded cover' loading='lazy' alt='" . h('Обложка: ' . $book->title) . "' src='$webroot/extract_cover.php?sid=" . intval($book->bookid) . "' />";
+	echo "</div><div class='book-card-actions'>";
 
 	$dt = book_date($book->time);
 	if (trim($book->filetype) == 'fb2') {
@@ -416,7 +422,7 @@ function book_info_pg($book, $webroot = '', $full = false) {
 	}
 	echo "</div>";
 
-	echo "</div><div class='col-sm-10'>";
+	echo "</div><div class='book-card-info'>";
 	// Authors, genres and series are library content, so they come from the cache
 	// in one go instead of three queries per book.
 	$header_lists = book_header_lists($dbh, intval($book->bookid));
