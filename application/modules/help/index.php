@@ -102,7 +102,7 @@ echo "<p>Если вы забыли пароль администратора и
 echo "<p>Новый административный аккаунт можно создать с помощью параметров переменной окружения <strong>FLIBUSTA_APP_ADMIN</strong> и пароля, заданного через переменную <strong>FLIBUSTA_APP_ADMIN_PASSWORD</strong> или секрет  <strong>FLIBUSTA_APP_ADMIN_PWD</strong>). 
     Использование Docker secrets для хранения пароля предпочтительнее, чем прямая передача его в окружении. После определения нового администратора в переменных docker-compose.yml, нужно перезапустить контейнер. Обратите внимание, нужно создать новый аккаунт.</p>";
 echo "<p>После создания нового администратора войдите с его данными и удалите старый аккаунт, если он больше не нужен либо измените его пароль чтобы получить доступ.</p><hr style='width:50%; margin:auto;'/><br><br><br>";
-echo "<h5>Юридическая информация / Legal notice</h5>";
+echo "<h5 id='legal'>Юридическая информация / Legal notice</h5>";
 echo "<h6>Лицензия / License</h6>";
 echo "<p>Проект распространяется по лицензии <strong>GPL v2</strong>. Исходный код доступен на GitHub: <a href='https://github.com/blitvin/flibusta'>github.com/blitvin/flibusta</a>.</p>";
 echo "<p>The project is distributed under the <strong>GPL v2</strong> license. The source code is available at <a href='https://github.com/blitvin/flibusta'>github.com/blitvin/flibusta</a>.</p>";

@@ -182,7 +182,7 @@ finally {
 <footer class="container whb rounded-bottom mb-3 py-2 text-center small site-footer">
 	<a href="<?= $webroot ?>/help/">Справка</a>
 	<span class="mx-2" aria-hidden="true">·</span>
-	<a href="<?= $webroot ?>/help/#opds" title="Как подключить библиотеку в приложении-читалке">OPDS для читалок</a>
+	<a href="<?= $webroot ?>/help/#legal" title="Лицензии, сторонние компоненты, отказ от ответственности">Юридическая информация</a>
 </footer>
 
 
