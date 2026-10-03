@@ -20,7 +20,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_id'])) {
 
 echo "<h4>Активные сессии</h4>";
 
-$sessions = session_store()->listSessions();
+// Anonymous and long-lived trusted-network sessions pile up with traffic, so
+// only the most recent ones are rendered.
+$sessionLimit = 200;
+$sessions = session_store()->listSessions($sessionLimit);
+if (count($sessions) >= $sessionLimit) {
+    $sessionTotal = session_store()->countSessions();
+    if ($sessionTotal > count($sessions)) {
+        echo "<p class='text-muted'>Показаны последние " . count($sessions) . " из ~" . $sessionTotal . ".</p>";
+    }
+}
 
 if ($sessions) {
     echo "<table class='table'><thead><tr><th>ID сессии</th><th>Последний доступ</th><th>Пользователь</th><th>User-Agent</th><th>IP входа</th><th>Действия</th></tr></thead><tbody>";

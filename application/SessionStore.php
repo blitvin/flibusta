@@ -14,12 +14,18 @@
 interface SessionStore
 {
 	/**
-	 * Every live session, most recently used first.
+	 * The $limit most recently used live sessions, newest first.
 	 *
 	 * @return list<object> rows carrying id, last_accessed, username, user_agent,
 	 *                      ip_address - the columns the admin tab renders.
 	 */
-	public function listSessions(): array;
+	public function listSessions(int $limit = 200): array;
+
+	/**
+	 * Number of sessions in the store, for the "N of M" note on the admin tab. The
+	 * Redis store counts its index, which may still hold a few expired ids.
+	 */
+	public function countSessions(): int;
 
 	/** Drops one session by id. */
 	public function deleteSession(string $id): void;
@@ -43,13 +49,20 @@ final class PostgresSessionStore implements SessionStore
 	{
 	}
 
-	public function listSessions(): array
+	public function listSessions(int $limit = 200): array
 	{
-		$stmt = $this->pdo->query(
+		$stmt = $this->pdo->prepare(
 			"SELECT id, last_accessed, username, user_agent, ip_address
-			 FROM php_sessions ORDER BY last_accessed DESC"
+			 FROM php_sessions ORDER BY last_accessed DESC LIMIT ?"
 		);
+		$stmt->bindValue(1, max(1, $limit), PDO::PARAM_INT);
+		$stmt->execute();
 		return $stmt->fetchAll(PDO::FETCH_OBJ);
+	}
+
+	public function countSessions(): int
+	{
+		return (int)$this->pdo->query("SELECT COUNT(*) FROM php_sessions")->fetchColumn();
 	}
 
 	public function deleteSession(string $id): void
@@ -123,48 +136,69 @@ final class RedisSessionStore implements SessionStore
 	{
 	}
 
-	public function listSessions(): array
+	public function countSessions(): int
 	{
 		try {
-			$ids = $this->redis->zRevRange(SESSION_REDIS_INDEX, 0, -1);
+			return (int)$this->redis->zCard(SESSION_REDIS_INDEX);
 		} catch (Throwable $e) {
-			error_log('Flibusta: cannot list sessions: ' . $e->getMessage());
-			return [];
+			return 0;
 		}
-		if (!$ids) {
-			return [];
-		}
+	}
 
-		try {
-			$pipe = $this->redis->multi(Redis::PIPELINE);
-			foreach ($ids as $id) {
-				$pipe->hMGet(session_redis_key((string)$id),
-					['user_id', 'username', 'ip', 'ua', 'last_accessed']);
-			}
-			$rows = $pipe->exec();
-		} catch (Throwable $e) {
-			error_log('Flibusta: cannot read sessions: ' . $e->getMessage());
-			return [];
-		}
-
-		$out     = [];
+	public function listSessions(int $limit = 200): array
+	{
+		$limit    = max(1, $limit);
+		$out      = [];
 		$vanished = [];
-		foreach ($ids as $i => $id) {
-			$row = $rows[$i] ?? false;
-			// An expired session leaves its id in the index; hMGet then answers with
-			// nulls for every field.
-			if (!is_array($row) || ($row['last_accessed'] ?? null) === false
-					|| ($row['last_accessed'] ?? null) === null) {
-				$vanished[] = (string)$id;
-				continue;
+		// Expired sessions leave their ids behind in the index, so one window of
+		// $limit ids may yield fewer live rows - keep reading until it is filled.
+		// Pruning waits until the end so the offsets stay valid.
+		for ($offset = 0; count($out) < $limit; $offset += $limit) {
+			try {
+				$ids = $this->redis->zRevRange(SESSION_REDIS_INDEX, $offset, $offset + $limit - 1);
+			} catch (Throwable $e) {
+				error_log('Flibusta: cannot list sessions: ' . $e->getMessage());
+				break;
 			}
-			$session                = new stdClass();
-			$session->id            = (string)$id;
-			$session->last_accessed = date('Y-m-d H:i:s', (int)$row['last_accessed']);
-			$session->username      = $row['username'] !== false ? $row['username'] : null;
-			$session->user_agent    = $row['ua'] !== false ? $row['ua'] : null;
-			$session->ip_address    = $row['ip'] !== false ? $row['ip'] : null;
-			$out[] = $session;
+			if (!$ids) {
+				break;
+			}
+
+			try {
+				$pipe = $this->redis->multi(Redis::PIPELINE);
+				foreach ($ids as $id) {
+					$pipe->hMGet(session_redis_key((string)$id),
+						['user_id', 'username', 'ip', 'ua', 'last_accessed']);
+				}
+				$rows = $pipe->exec();
+			} catch (Throwable $e) {
+				error_log('Flibusta: cannot read sessions: ' . $e->getMessage());
+				break;
+			}
+
+			foreach ($ids as $i => $id) {
+				$row = $rows[$i] ?? false;
+				// An expired session leaves its id in the index; hMGet then answers with
+				// nulls for every field.
+				if (!is_array($row) || ($row['last_accessed'] ?? null) === false
+						|| ($row['last_accessed'] ?? null) === null) {
+					$vanished[] = (string)$id;
+					continue;
+				}
+				if (count($out) >= $limit) {
+					continue;
+				}
+				$session                = new stdClass();
+				$session->id            = (string)$id;
+				$session->last_accessed = date('Y-m-d H:i:s', (int)$row['last_accessed']);
+				$session->username      = $row['username'] !== false ? $row['username'] : null;
+				$session->user_agent    = $row['ua'] !== false ? $row['ua'] : null;
+				$session->ip_address    = $row['ip'] !== false ? $row['ip'] : null;
+				$out[] = $session;
+			}
+			if (count($ids) < $limit) {
+				break;
+			}
 		}
 		if ($vanished) {
 			try {

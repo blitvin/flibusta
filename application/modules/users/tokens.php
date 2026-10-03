@@ -23,8 +23,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_id'])) {
 
 echo "<h4>Токены remember-me</h4>";
 
-$stmt = $dbh->query("SELECT t.id, t.selector, t.expires_at, u.username FROM user_tokens t JOIN users u ON t.user_id = u.id ORDER BY t.expires_at DESC");
+$tokenLimit = 200;
+$stmt = $dbh->query("SELECT t.id, t.selector, t.expires_at, u.username FROM user_tokens t JOIN users u ON t.user_id = u.id ORDER BY t.expires_at DESC LIMIT $tokenLimit");
 $tokens = $stmt->fetchAll(PDO::FETCH_OBJ);
+if (count($tokens) >= $tokenLimit) {
+    $tokenTotal = (int)$dbh->query("SELECT COUNT(*) FROM user_tokens")->fetchColumn();
+    if ($tokenTotal > count($tokens)) {
+        echo "<p class='text-muted'>Показаны " . count($tokens) . " из " . $tokenTotal . " (с самым поздним сроком истечения).</p>";
+    }
+}
 
 if ($tokens) {
     echo "<table class='table'><thead><tr><th>ID</th><th>Селектор</th><th>Пользователь</th><th>Истекает</th><th>Действия</th></tr></thead><tbody>";
