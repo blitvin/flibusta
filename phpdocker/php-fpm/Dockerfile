@@ -3,7 +3,7 @@
 # Update FBC_VERSION here when upgrading.
 FROM --platform=$BUILDPLATFORM alpine AS fb2cng-downloader
 ARG TARGETARCH
-ARG FBC_VERSION=v1.7.0
+ARG FBC_VERSION=v1.9.1
 RUN apk add --no-cache curl unzip && \
     case "$TARGETARCH" in \
       amd64) ARCH="amd64" ;; \
