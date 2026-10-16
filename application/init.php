@@ -52,8 +52,17 @@ define('ADMIN_ACCESS_BY_HTTPS', getenv("FLIBUSTA_ALLOW_ADMIN_ACCESS_BY_HTTP") !=
 define('FLIBUSTA_URL', getenv('FLIBUSTA_URL') ?: 'https://flibusta.is');
 define('FLIBUSTA_MISSING_BOOK_DOWNLOAD', getenv('FLIBUSTA_ENABLE_MISSING_BOOK_DOWNLOAD') !== 'false');
 
+// Idle session timeouts off the trusted network, in seconds. Readers get the long
+// one; admin sessions are cut after ADMIN_SESSION_TTL without a page view
+// (session_touch() in functions.php, which also renews the cookie while active).
+$_ttl = (int)(getenv('FLIBUSTA_SESSION_TTL') ?: 86400);
+define('SESSION_TTL', max(300, $_ttl));
+$_ttl = (int)(getenv('FLIBUSTA_ADMIN_SESSION_TTL') ?: 14400);
+define('ADMIN_SESSION_TTL', max(300, $_ttl));
+unset($_ttl);
+
 $isTrustedClient = (TRUSTED_NET !== '') && ipInNetwork($_SERVER['REMOTE_ADDR'] ?? '', TRUSTED_NET);
-session_set_cookie_params([ 'lifetime' => $isTrustedClient ? 3600 * 24 * 365 : 3600 * 4,
+session_set_cookie_params([ 'lifetime' => $isTrustedClient ? 3600 * 24 * 365 : SESSION_TTL,
                             'path' => $webroot != "" ? $webroot : "/",
                             'domain' => '',
                             'secure' => ADMIN_ACCESS_BY_HTTPS,
@@ -70,11 +79,11 @@ ini_set('session.serialize_handler', 'php_serialize');
 ini_set('session.cookie_httponly', '1'); // Prevent Javascript from stealing the cookie
 ini_set('session.use_only_cookies', '1');
 
-// PHP's built-in default is 24 minutes, far shorter than the 4h cookie handed out
+// PHP's built-in default is 24 minutes, far shorter than the cookie handed out
 // above, so a browsing reader could be logged out while their cookie was still
 // valid. Both backends read this: the Postgres handler passes it to its gc(), the
-// Redis handler uses its own per-client TTL.
-ini_set('session.gc_maxlifetime', '14400');
+// Redis handler uses its own per-client TTL (session_redis_ttl(), same value).
+ini_set('session.gc_maxlifetime', (string)SESSION_TTL);
 
 include_once __DIR__ . '/cache.php';
 include_once __DIR__ . '/SessionStore.php';

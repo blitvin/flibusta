@@ -235,5 +235,9 @@ line per request — the way to check that a hot path really is DB-free.
   disables both
 - `FLIBUSTA_SESSION_TRUSTED_TTL` — idle lifetime of a trusted-network session in
   Redis (default 30 days)
+- `FLIBUSTA_SESSION_TTL` / `FLIBUSTA_ADMIN_SESSION_TTL` — idle session timeout off
+  the trusted network for readers (default 1 day) and admins (default 4 h), in
+  seconds. The cookie is renewed on page views by `session_touch()`; an idle admin
+  is logged out and that device's remember-me token revoked
 - `FLIBUSTA_DEBUG_DB` — `true` logs per-request DB connection/statement counts
 - `FLIBUSTA_APP_ROOT`, `TZ` — bootstrap / timezone

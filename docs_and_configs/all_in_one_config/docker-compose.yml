@@ -105,6 +105,10 @@ services:
             # - FLIBUSTA_ALLOW_ADMIN_ACCESS_BY_HTTP=true
             - FLIBUSTA_URL=https://flibusta.is
             - FLIBUSTA_ENABLE_MISSING_BOOK_DOWNLOAD=true
+            # Idle session timeouts off the trusted network, in seconds: readers
+            # (default one day) and admins (default 4 hours).
+            # - FLIBUSTA_SESSION_TTL=86400
+            # - FLIBUSTA_ADMIN_SESSION_TTL=14400
             # Optional: comment out to keep sessions in Postgres and the cache off.
             - FLIBUSTA_REDIS_HOST=redis
             - FLIBUSTA_REDIS_PORT=6379

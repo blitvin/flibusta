@@ -121,10 +121,10 @@ const SESSION_REDIS_INDEX = 'sess:all';
 function session_redis_ttl(bool $trusted): int
 {
 	if (!$trusted) {
-		// Matches the 4h session cookie set in init.php. (PHP's built-in default of
-		// 24 minutes, which the Postgres backend still uses, is far shorter than the
-		// cookie it hands out.)
-		return 4 * 3600;
+		// Matches the session cookie lifetime set in init.php. The shorter admin
+		// limit is enforced by session_touch(), not here. Falls back to 4h for a
+		// CLI tool that includes this file without init.php.
+		return defined('SESSION_TTL') ? SESSION_TTL : 4 * 3600;
 	}
 	$configured = (int)(getenv('FLIBUSTA_SESSION_TRUSTED_TTL') ?: 0);
 	return $configured > 0 ? $configured : 30 * 86400;

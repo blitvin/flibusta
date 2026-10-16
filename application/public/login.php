@@ -57,6 +57,8 @@ body {
                     <h4 class="card-title mb-3">Вход в библиотеку</h4>
                     <?php if ($error): ?>
                         <div class="alert alert-danger py-2"><?= htmlspecialchars($error, ENT_QUOTES, 'UTF-8') ?></div>
+                    <?php elseif (isset($_GET['expired'])): ?>
+                        <div class="alert alert-info py-2">Сеанс администратора завершён после долгого бездействия. Войдите снова.</div>
                     <?php endif; ?>
                     <form method="post" action="login.php">
                         <input type="hidden" name="csrf_token"

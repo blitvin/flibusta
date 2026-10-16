@@ -1156,9 +1156,12 @@ function checkLogin($pdo, $minAdmin = false, $webroot= '') {
 		http_response_code(401);
 		die("Access denied.");
 	}
-	if (isset($_SESSION['user_id']))
+	if (isset($_SESSION['user_id'])) {
+		session_touch($pdo, $webroot);
 		return; // user is logged in , access grunted
+	}
 	if (checkRememberMe($pdo,$webroot)) {
+		session_touch($pdo, $webroot);
 		return;
 	}
 	http_response_code(303); //redirect to login
@@ -1167,6 +1170,63 @@ function checkLogin($pdo, $minAdmin = false, $webroot= '') {
 	// protected page into the redirect's body, so any client that does not
 	// follow redirects (curl, a feed reader, a scraper) read it in full.
 	exit;
+}
+
+/**
+ * Idle-timeout bookkeeping for a logged-in, off-trusted-network session.
+ *
+ * PHP sends the session cookie only when a session is created, so without this the
+ * browser dropped it a fixed time after log-in, even mid-reading. Here the cookie is
+ * re-sent with a fresh expiry, making the limit "this long without a page view":
+ * SESSION_TTL for readers, ADMIN_SESSION_TTL for admins. Both the session write and
+ * the header happen at most every SESSION_TOUCH_INTERVAL seconds.
+ *
+ * An admin idle for longer than ADMIN_SESSION_TTL is logged out here. That device's
+ * remember-me token goes too, or checkRememberMe() would log them straight back in.
+ */
+const SESSION_TOUCH_INTERVAL = 300;
+
+function session_touch($pdo, $webroot) {
+	// Trusted-network clients keep their long-lived cookie and no idle limit;
+	// checkLogin() lets admins on admin pages through to here as well.
+	if (TRUSTED_NET != '' && ipInNetwork($_SERVER['REMOTE_ADDR'] ?? '', TRUSTED_NET)) {
+		return;
+	}
+	$now = time();
+	$is_admin = !empty($_SESSION['is_admin']);
+	$last_seen = isset($_SESSION['last_seen']) ? (int)$_SESSION['last_seen'] : 0;
+
+	if ($is_admin && $last_seen > 0 && $now - $last_seen > ADMIN_SESSION_TTL) {
+		if (!empty($_COOKIE['flibusta_remember_me'])) {
+			$selector = explode(':', (string)$_COOKIE['flibusta_remember_me'])[0];
+			$pdo->prepare("DELETE FROM user_tokens WHERE selector = ?")->execute([$selector]);
+			clearRememberMeToken($webroot);
+		}
+		$_SESSION = array();
+		session_destroy();
+		http_response_code(303);
+		header("Location: " . $webroot . "/login.php?expired=1");
+		exit;
+	}
+
+	// Sessions from before this existed have no last_seen and count as fresh.
+	if ($now - $last_seen < SESSION_TOUCH_INTERVAL) {
+		return;
+	}
+	// An empty value would make setcookie() delete the cookie instead.
+	if (session_id() === '') {
+		return;
+	}
+	$_SESSION['last_seen'] = $now;
+	$params = session_get_cookie_params();
+	setcookie(session_name(), session_id(), [
+		'expires'  => $now + ($is_admin ? ADMIN_SESSION_TTL : SESSION_TTL),
+		'path'     => $params['path'],
+		'domain'   => $params['domain'],
+		'secure'   => $params['secure'],
+		'httponly' => $params['httponly'],
+		'samesite' => $params['samesite'],
+	]);
 }
 
 function checkOPDSLogin($pdo) {
